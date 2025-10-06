@@ -1,0 +1,421 @@
+import { 
+	CandidateProfile, 
+	Education, 
+	WorkExperience, 
+	WorkPersonality, 
+	Skill, 
+	Specialization, 
+	UserSkill, 
+	UserSpecialization, 
+	Media, 
+	IdentityDocument, 
+	JobPreference, 
+	AvailabilitySlot 
+} from '../models/index.js';
+
+// Step 1-2: Basic Profile
+export async function createProfile(req, res) {
+	const { fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		const [profile, created] = await CandidateProfile.findOrCreate({
+			where: { userId },
+			defaults: { fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe, userId }
+		});
+		
+		if (!created) {
+			await profile.update({ fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe });
+		}
+		
+		return res.status(200).json({ profile });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+export async function getProfile(req, res) {
+	const userId = req.user.sub;
+	
+	try {
+		const profile = await CandidateProfile.findOne({ where: { userId } });
+		return res.status(200).json({ profile });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Step 3: Education
+export async function addEducation(req, res) {
+	const { highestLevel, institution, fieldOfStudy, startDate, endDate } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		const education = await Education.create({
+			userId, highestLevel, institution, fieldOfStudy, startDate, endDate
+		});
+		return res.status(201).json({ education });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+export async function getEducations(req, res) {
+	const userId = req.user.sub;
+	
+	try {
+		const educations = await Education.findAll({ where: { userId } });
+		return res.status(200).json({ educations });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Step 3: Work Experience
+export async function addWorkExperience(req, res) {
+	const { company, roleTitle, startDate, endDate, isCurrent, yearsExperience, professionalRegNumber } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		const experience = await WorkExperience.create({
+			userId, company, roleTitle, startDate, endDate, isCurrent, yearsExperience, professionalRegNumber
+		});
+		return res.status(201).json({ experience });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+export async function getWorkExperiences(req, res) {
+	const userId = req.user.sub;
+	
+	try {
+		const experiences = await WorkExperience.findAll({ where: { userId } });
+		return res.status(200).json({ experiences });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Step 4: Work Personality
+export async function updateWorkPersonality(req, res) {
+	const { workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		const [personality, created] = await WorkPersonality.findOrCreate({
+			where: { userId },
+			defaults: { userId, workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations }
+		});
+		
+		if (!created) {
+			await personality.update({ workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations });
+		}
+		
+		return res.status(200).json({ personality });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Step 5: Skills and Specializations
+export async function addSkills(req, res) {
+	const { skillIds } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		// Remove existing skills
+		await UserSkill.destroy({ where: { userId } });
+		
+		// Add new skills
+		const userSkills = await Promise.all(
+			skillIds.map(skillId => UserSkill.create({ userId, skillId }))
+		);
+		
+		return res.status(200).json({ userSkills });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+export async function addSpecializations(req, res) {
+	const { specializationIds } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		// Remove existing specializations
+		await UserSpecialization.destroy({ where: { userId } });
+		
+		// Add new specializations
+		const userSpecializations = await Promise.all(
+			specializationIds.map(specializationId => UserSpecialization.create({ userId, specializationId }))
+		);
+		
+		return res.status(200).json({ userSpecializations });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Step 6: Media
+export async function uploadMedia(req, res) {
+	const { kind, url } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		const media = await Media.create({ userId, kind, url });
+		return res.status(201).json({ media });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+export async function getMedia(req, res) {
+	const userId = req.user.sub;
+	
+	try {
+		const media = await Media.findAll({ where: { userId } });
+		return res.status(200).json({ media });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Step 7: Identity Documents
+export async function uploadIdentityDocument(req, res) {
+	const { type, url } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		const document = await IdentityDocument.create({ userId, type, url });
+		return res.status(201).json({ document });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+export async function getIdentityDocuments(req, res) {
+	const userId = req.user.sub;
+	
+	try {
+		const documents = await IdentityDocument.findAll({ where: { userId } });
+		return res.status(200).json({ documents });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Step 8: Job Preferences
+export async function updateJobPreferences(req, res) {
+	const { idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, preferredLocations, searchRadiusKm, salaryPreference } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		const [preferences, created] = await JobPreference.findOrCreate({
+			where: { userId },
+			defaults: { userId, idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, preferredLocations, searchRadiusKm, salaryPreference }
+		});
+		
+		if (!created) {
+			await preferences.update({ idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, preferredLocations, searchRadiusKm, salaryPreference });
+		}
+		
+		return res.status(200).json({ preferences });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Step 8: Availability
+export async function addAvailabilitySlot(req, res) {
+	const { start, end } = req.body;
+	const userId = req.user.sub;
+	
+	try {
+		const slot = await AvailabilitySlot.create({ userId, start, end });
+		return res.status(201).json({ slot });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+export async function getAvailabilitySlots(req, res) {
+	const userId = req.user.sub;
+	
+	try {
+		const slots = await AvailabilitySlot.findAll({ where: { userId } });
+		return res.status(200).json({ slots });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Get all skills and specializations for dropdowns
+export async function getAllSkills(req, res) {
+	try {
+		const skills = await Skill.findAll();
+		return res.status(200).json({ skills });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+export async function getAllSpecializations(req, res) {
+	try {
+		const specializations = await Specialization.findAll();
+		return res.status(200).json({ specializations });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Complete Profile Update (All Steps in One)
+export async function updateCompleteProfile(req, res) {
+	const userId = req.user.sub;
+	const {
+		// Step 1-2: Basic Profile
+		fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe,
+		// Step 3: Education & Experience
+		educations, workExperiences,
+		// Step 4: Work Personality
+		workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations,
+		// Step 5: Skills & Specializations
+		skillIds, specializationIds,
+		// Step 6: Media
+		media,
+		// Step 7: Identity Documents
+		documents,
+		// Step 8: Job Preferences & Availability
+		jobPreferences, availabilitySlots
+	} = req.body;
+
+	try {
+		// Step 1-2: Update/Create Profile
+		if (fullName || gender || jobTitle || currentStatus || linkedinUrl || aboutMe) {
+			const [profile] = await CandidateProfile.findOrCreate({
+				where: { userId },
+				defaults: { userId, fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe }
+			});
+			await profile.update({ fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe });
+		}
+
+		// Step 3: Handle Educations
+		if (educations && educations.length > 0) {
+			await Education.destroy({ where: { userId } });
+			await Promise.all(educations.map(edu => Education.create({ ...edu, userId })));
+		}
+
+		// Step 3: Handle Work Experiences
+		if (workExperiences && workExperiences.length > 0) {
+			await WorkExperience.destroy({ where: { userId } });
+			await Promise.all(workExperiences.map(exp => WorkExperience.create({ ...exp, userId })));
+		}
+
+		// Step 4: Work Personality
+		if (workingSuperpower || favoriteWorkVibe || tacklingDifficultSituations) {
+			const [personality] = await WorkPersonality.findOrCreate({
+				where: { userId },
+				defaults: { userId, workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations }
+			});
+			await personality.update({ workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations });
+		}
+
+		// Step 5: Skills
+		if (skillIds && skillIds.length > 0) {
+			await UserSkill.destroy({ where: { userId } });
+			// Create skills if they don't exist, then link them
+			for (const skillName of skillIds) {
+				const [skill] = await Skill.findOrCreate({
+					where: { name: skillName },
+					defaults: { name: skillName }
+				});
+				await UserSkill.create({ userId, skillId: skill.id });
+			}
+		}
+
+		// Step 5: Specializations
+		if (specializationIds && specializationIds.length > 0) {
+			await UserSpecialization.destroy({ where: { userId } });
+			// Create specializations if they don't exist, then link them
+			for (const specName of specializationIds) {
+				const [specialization] = await Specialization.findOrCreate({
+					where: { name: specName },
+					defaults: { name: specName }
+				});
+				await UserSpecialization.create({ userId, specializationId: specialization.id });
+			}
+		}
+
+		// Step 6: Media
+		if (media && media.length > 0) {
+			await Media.destroy({ where: { userId } });
+			await Promise.all(media.map(m => Media.create({ ...m, userId })));
+		}
+
+		// Step 7: Identity Documents
+		if (documents && documents.length > 0) {
+			await IdentityDocument.destroy({ where: { userId } });
+			await Promise.all(documents.map(doc => IdentityDocument.create({ ...doc, userId })));
+		}
+
+		// Step 8: Job Preferences
+		if (jobPreferences) {
+			const [preferences] = await JobPreference.findOrCreate({
+				where: { userId },
+				defaults: { ...jobPreferences, userId }
+			});
+			await preferences.update(jobPreferences);
+		}
+
+		// Step 8: Availability Slots
+		if (availabilitySlots && availabilitySlots.length > 0) {
+			await AvailabilitySlot.destroy({ where: { userId } });
+			await Promise.all(availabilitySlots.map(slot => AvailabilitySlot.create({ ...slot, userId })));
+		}
+
+		return res.status(200).json({ message: 'Profile updated successfully' });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Get Complete Profile (All Data)
+export async function getCompleteProfile(req, res) {
+	const userId = req.user.sub;
+	
+	try {
+		const profile = await CandidateProfile.findOne({ where: { userId } });
+		const educations = await Education.findAll({ where: { userId } });
+		const workExperiences = await WorkExperience.findAll({ where: { userId } });
+		const personality = await WorkPersonality.findOne({ where: { userId } });
+		const media = await Media.findAll({ where: { userId } });
+		const documents = await IdentityDocument.findAll({ where: { userId } });
+		const jobPreferences = await JobPreference.findOne({ where: { userId } });
+		const availabilitySlots = await AvailabilitySlot.findAll({ where: { userId } });
+
+		// Get user skills and specializations with names
+		const userSkills = await UserSkill.findAll({ 
+			where: { userId },
+			include: [{ model: Skill }]
+		});
+		const userSpecializations = await UserSpecialization.findAll({ 
+			where: { userId },
+			include: [{ model: Specialization }]
+		});
+
+		return res.status(200).json({
+			profile,
+			educations,
+			workExperiences,
+			personality,
+			skills: userSkills,
+			specializations: userSpecializations,
+			media,
+			documents,
+			jobPreferences,
+			availabilitySlots
+		});
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
