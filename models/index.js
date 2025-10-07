@@ -3,7 +3,7 @@ import CandidateProfile from './profile/candidateProfile.js';
 import Education from './profile/education.js';
 import WorkExperience from './profile/workExperience.js';
 import WorkPersonality from './profile/workPersonality.js';
-import Skill from './profile/Skill.js';
+import Skill from './profile/skill.js';
 import Specialization from './profile/Specialization.js';
 import UserSkill from './profile/UserSkill.js';
 import UserSpecialization from './profile/UserSpecialization.js';

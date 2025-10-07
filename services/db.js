@@ -14,7 +14,7 @@ const {
 let sequelize;
 
 // Prefer full URL if provided (Neon supplies this)
-const url = DATABASE_URL || POSTGRES_URL || DATABASE_URI;
+const url = DATABASE_URL;
 if (url) {
 	sequelize = new Sequelize(url, {
 		dialect: 'postgres',
