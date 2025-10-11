@@ -4,6 +4,7 @@ import morgan from 'morgan';
 import { connectToDatabase } from './services/db.js';
 import authRouter from './api/auth.js';
 import profileRouter from './api/profile.js';
+import practiceRouter from './api/practice.js';
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(json());
 app.use(morgan('dev'));
 app.use('/api/auth', authRouter);
 app.use('/api/profile', profileRouter);
+app.use('/api/practice', practiceRouter);
 
 // Health check
 app.get('/health', (req, res) => {

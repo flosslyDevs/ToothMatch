@@ -156,6 +156,12 @@ export async function resetPassword(event) {
 	await user.save();
 	return { status: 200, body: { message: 'Password reset successfully' } };
 }
+export async function logout(event) {
+	// For JWT-based auth, logout is typically handled client-side by discarding the token
+	// This endpoint can be used for logging purposes or future token blacklisting
+	return { status: 200, body: { message: 'Logged out successfully' } };
+}
+
 export async function profile() { return { status: 501, body: { message: 'Not implemented' } }; }
 export async function userLoginHistory() { return { status: 501, body: { message: 'Not implemented' } }; }
 export async function updateProfile() { return { status: 501, body: { message: 'Not implemented' } }; }

@@ -2,6 +2,7 @@ import express from 'express';
 import {
 	forgetPasswordRequest,
 	login,
+	logout,
 	resetPassword,
 	signupRequest,
 	verifyEmail,
@@ -36,7 +37,10 @@ router.post('/reset-password', async (req, res) => {
 	return res.status(result?.status || 200).json(result?.body ?? result);
 });
 
-export default router;
+router.post('/logout', async (req, res) => {
+	const result = await logout({ req, body: req.body });
+	return res.status(result?.status || 200).json(result?.body ?? result);
+});
 
 // OAuth
 router.post('/google', async (req, res) => {
@@ -48,3 +52,5 @@ router.post('/apple', async (req, res) => {
 	const result = await appleAuth({ req, body: req.body });
 	return res.status(result?.status || 200).json(result?.body ?? result);
 });
+
+export default router;
