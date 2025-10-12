@@ -3,6 +3,7 @@ import {
 	forgetPasswordRequest,
 	login,
 	logout,
+	resendOtp,
 	resetPassword,
 	signupRequest,
 	verifyEmail,
@@ -24,6 +25,11 @@ router.post('/signup', async (req, res) => {
 
 router.post('/verify-email', async (req, res) => {
 	const result = await verifyEmail({ req, body: req.body });
+	return res.status(result?.status || 200).json(result?.body ?? result);
+});
+
+router.post('/resend-otp', async (req, res) => {
+	const result = await resendOtp({ req, body: req.body });
 	return res.status(result?.status || 200).json(result?.body ?? result);
 });
 

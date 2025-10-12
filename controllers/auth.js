@@ -162,6 +162,32 @@ export async function logout(event) {
 	return { status: 200, body: { message: 'Logged out successfully' } };
 }
 
+export async function resendOtp(event) {
+	const { email } = getBody(event);
+	if (!email) {
+		return { status: 400, body: { message: 'Email is required' } };
+	}
+	
+	const user = await User.findOne({ where: { email } });
+	if (!user) {
+		return { status: 404, body: { message: 'User not found' } };
+	}
+	
+	if (user.isEmailVerified) {
+		return { status: 400, body: { message: 'Email is already verified' } };
+	}
+	
+	// Generate new verification code
+	const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+	user.verificationCode = verificationCode;
+	await user.save();
+	
+	// Send verification email
+	await sendVerificationEmail(email, verificationCode);
+	
+	return { status: 200, body: { message: 'OTP resent successfully' } };
+}
+
 export async function profile() { return { status: 501, body: { message: 'Not implemented' } }; }
 export async function userLoginHistory() { return { status: 501, body: { message: 'Not implemented' } }; }
 export async function updateProfile() { return { status: 501, body: { message: 'Not implemented' } }; }
