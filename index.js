@@ -6,6 +6,8 @@ import authRouter from './api/auth.js';
 import configRouter from './api/config.js';
 import profileRouter from './api/profile.js';
 import practiceRouter from './api/practice.js';
+import uploadRouter from './api/upload.js';
+import path from 'path';
 
 const app = express();
 
@@ -16,6 +18,9 @@ app.use('/api/auth', authRouter);
 app.use('/api/config', configRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/practice', practiceRouter);
+app.use('/api/upload', uploadRouter);
+// Serve uploads folder statically
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Health check
 app.get('/health', (req, res) => {

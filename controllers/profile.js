@@ -51,9 +51,7 @@ export async function addEducation(req, res) {
 	const userId = req.user.sub;
 	
 	try {
-		const education = await Education.create({
-			userId, highestLevel, institution, fieldOfStudy, startDate, endDate
-		});
+		const education = await Education.create({ userId, highestLevel, institution, fieldOfStudy, startDate, endDate });
 		return res.status(201).json({ education });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
@@ -77,6 +75,9 @@ export async function addWorkExperience(req, res) {
 	const userId = req.user.sub;
 	
 	try {
+		if (!company) {
+			return res.status(400).json({ message: 'company is required' });
+		}
 		const experience = await WorkExperience.create({
 			userId, company, roleTitle, startDate, endDate, isCurrent, yearsExperience, professionalRegNumber
 		});
@@ -302,13 +303,23 @@ export async function updateCompleteProfile(req, res) {
 		// Step 3: Handle Educations
 		if (educations && educations.length > 0) {
 			await Education.destroy({ where: { userId } });
-			await Promise.all(educations.map(edu => Education.create({ ...edu, userId })));
+			await Promise.all(
+				educations.map(edu => Education.create({
+					userId,
+					highestLevel: edu?.highestLevel ?? null,
+					institution: edu?.institution ?? null,
+					fieldOfStudy: edu?.fieldOfStudy ?? null,
+					startDate: edu?.startDate ?? null,
+					endDate: edu?.endDate ?? null,
+				}))
+			);
 		}
 
 		// Step 3: Handle Work Experiences
 		if (workExperiences && workExperiences.length > 0) {
 			await WorkExperience.destroy({ where: { userId } });
-			await Promise.all(workExperiences.map(exp => WorkExperience.create({ ...exp, userId })));
+			const filteredExperiences = workExperiences.filter(exp => !!exp?.company);
+			await Promise.all(filteredExperiences.map(exp => WorkExperience.create({ ...exp, userId })));
 		}
 
 		// Step 4: Work Personality

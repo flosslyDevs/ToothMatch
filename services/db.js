@@ -16,20 +16,20 @@ let sequelize;
 // Prefer full URL if provided (Neon supplies this)
 const url = DATABASE_URL;
 if (url) {
-	sequelize = new Sequelize(url, {
+    sequelize = new Sequelize(url, {
 		dialect: 'postgres',
 		protocol: 'postgres',
 		dialectOptions: {
 			ssl: { require: true, rejectUnauthorized: false },
 		},
-		logging: false,
+        logging: false,
 	});
 } else if (PGHOST) {
 	// Build from discrete env vars (PG*)
 	if (!PGDATABASE || !PGUSER) {
 		console.error('PGDATABASE and PGUSER must be set when using discrete PG env vars.');
 	} else {
-		sequelize = new Sequelize(PGDATABASE, PGUSER, PGPASSWORD || '', {
+        sequelize = new Sequelize(PGDATABASE, PGUSER, PGPASSWORD || '', {
 			host: PGHOST,
 			port: Number(PGPORT) || 5432,
 			dialect: 'postgres',
@@ -37,7 +37,7 @@ if (url) {
 			dialectOptions: {
 				ssl: { require: true, rejectUnauthorized: false },
 			},
-			logging: false,
+            logging: console.log,
 		});
 	}
 } else {
