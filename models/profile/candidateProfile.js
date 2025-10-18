@@ -7,7 +7,7 @@ const CandidateProfile = sequelize?.define('CandidateProfile', {
 	fullName: { type: DataTypes.STRING, allowNull: false },
 	gender: { type: DataTypes.STRING, allowNull: true },
 	jobTitle: { type: DataTypes.STRING, allowNull: true },
-	currentStatus: { type: DataTypes.ENUM('working', 'jobhunting', 'career_break'), allowNull: true },
+	currentStatus: { type: DataTypes.STRING, allowNull: true },
 	linkedinUrl: { type: DataTypes.STRING, allowNull: true },
 	aboutMe: { type: DataTypes.TEXT, allowNull: true },
 }, { tableName: 'candidate_profiles', underscored: true });
