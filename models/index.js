@@ -17,6 +17,7 @@ import PracticeLocation from './practice/practiceLocation.js';
 import PracticeCompliance from './practice/practiceCompliance.js';
 import PracticePayment from './practice/practicePayment.js';
 import PracticeCulture from './practice/practiceCulture.js';
+import LocumShift from './practice/locumShift.js';
 
 // Associations
 CandidateProfile.belongsTo(User, { foreignKey: 'userId' });
@@ -79,6 +80,10 @@ User.hasOne(PracticePayment, { foreignKey: 'userId' });
 PracticeCulture.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(PracticeCulture, { foreignKey: 'userId' });
 
+// Locum Shift associations
+LocumShift.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(LocumShift, { foreignKey: 'userId' });
+
 export {
 	User,
 	CandidateProfile,
@@ -99,6 +104,7 @@ export {
 	PracticeCompliance,
 	PracticePayment,
 	PracticeCulture,
+	LocumShift,
 };
 
 
