@@ -18,6 +18,7 @@ import PracticeCompliance from './practice/practiceCompliance.js';
 import PracticePayment from './practice/practicePayment.js';
 import PracticeCulture from './practice/practiceCulture.js';
 import LocumShift from './practice/locumShift.js';
+import PermanentJob from './practice/permanentJob.js';
 
 // Associations
 CandidateProfile.belongsTo(User, { foreignKey: 'userId' });
@@ -84,6 +85,10 @@ User.hasOne(PracticeCulture, { foreignKey: 'userId' });
 LocumShift.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(LocumShift, { foreignKey: 'userId' });
 
+// Permanent Job associations
+PermanentJob.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(PermanentJob, { foreignKey: 'userId' });
+
 export {
 	User,
 	CandidateProfile,
@@ -105,6 +110,7 @@ export {
 	PracticePayment,
 	PracticeCulture,
 	LocumShift,
+	PermanentJob,
 };
 
 

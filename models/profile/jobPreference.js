@@ -6,7 +6,7 @@ const JobPreference = sequelize?.define('JobPreference', {
 	userId: { type: DataTypes.UUID, allowNull: false },
 	idealJobTitle: { type: DataTypes.STRING, allowNull: true },
 	lookingFor: { type: DataTypes.STRING, allowNull: true },
-	jobType: { type: DataTypes.ENUM('full_time', 'part_time', 'locum', 'contract'), allowNull: true },
+	jobType: { type: DataTypes.STRING, allowNull: true },
 	workingPattern: { type: DataTypes.STRING, allowNull: true },
 	payMin: { type: DataTypes.INTEGER, allowNull: true },
 	payMax: { type: DataTypes.INTEGER, allowNull: true },
