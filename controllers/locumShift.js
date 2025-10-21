@@ -1,4 +1,5 @@
-import { LocumShift } from '../models/index.js';
+import { LocumShift, User } from '../models/index.js';
+import { Op } from 'sequelize';
 
 // Create a new locum shift
 export async function createLocumShift(req, res) {
@@ -101,6 +102,8 @@ export async function getLocumShiftById(req, res) {
 	const userId = req.user.sub;
 
 	try {
+		console.log('Looking for locum shift with ID:', id, 'and userId:', userId);
+		
 		const locumShift = await LocumShift.findOne({
 			where: { id, userId }
 		});
@@ -111,6 +114,7 @@ export async function getLocumShiftById(req, res) {
 
 		return res.status(200).json({ locumShift });
 	} catch (error) {
+		console.error('Error in getLocumShiftById:', error);
 		return res.status(500).json({ message: error.message });
 	}
 }
@@ -122,6 +126,9 @@ export async function updateLocumShift(req, res) {
 	const updateData = req.body;
 
 	try {
+		console.log('Updating locum shift with ID:', id, 'and userId:', userId);
+		console.log('Update data:', updateData);
+		
 		const locumShift = await LocumShift.findOne({
 			where: { id, userId }
 		});
@@ -135,6 +142,7 @@ export async function updateLocumShift(req, res) {
 
 		return res.status(200).json({ locumShift });
 	} catch (error) {
+		console.error('Error in updateLocumShift:', error);
 		return res.status(500).json({ message: error.message });
 	}
 }
@@ -145,6 +153,8 @@ export async function deleteLocumShift(req, res) {
 	const userId = req.user.sub;
 
 	try {
+		console.log('Deleting locum shift with ID:', id, 'and userId:', userId);
+		
 		const locumShift = await LocumShift.findOne({
 			where: { id, userId }
 		});
@@ -157,6 +167,7 @@ export async function deleteLocumShift(req, res) {
 
 		return res.status(200).json({ message: 'Locum shift deleted successfully' });
 	} catch (error) {
+		console.error('Error in deleteLocumShift:', error);
 		return res.status(500).json({ message: error.message });
 	}
 }
@@ -191,7 +202,14 @@ export async function getPublicLocumShifts(req, res) {
 			where: whereClause,
 			order: [['date', 'ASC'], ['createdAt', 'DESC']],
 			limit: parseInt(limit),
-			offset: parseInt(offset)
+			offset: parseInt(offset),
+			include: [
+				{
+					model: User,
+					attributes: ['id', 'fullName', 'email'],
+					where: { role: 'practice' }
+				}
+			]
 		});
 
 		return res.status(200).json({

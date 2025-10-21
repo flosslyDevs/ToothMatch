@@ -11,6 +11,9 @@ import {
 
 const router = express.Router();
 
+// Public route (no auth required) - for candidates to browse
+router.get('/public/browse', getPublicLocumShifts);
+
 // Practice routes (authenticated)
 router.use(authMiddleware);
 
@@ -21,15 +24,12 @@ router.post('/', createLocumShift);
 router.get('/', getLocumShifts);
 
 // Get a specific locum shift by ID
-router.get('/:id', getLocumShiftById);
+router.get('/shift/:id', getLocumShiftById);
 
 // Update a locum shift
-router.put('/:id', updateLocumShift);
+router.put('/shift/:id', updateLocumShift);
 
 // Delete a locum shift
-router.delete('/:id', deleteLocumShift);
-
-// Public route (no auth required) - for candidates to browse
-router.get('/public/browse', getPublicLocumShifts);
+router.delete('/shift/:id', deleteLocumShift);
 
 export default router;
