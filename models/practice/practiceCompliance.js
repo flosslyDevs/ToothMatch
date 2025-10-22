@@ -7,6 +7,7 @@ const PracticeCompliance = sequelize?.define('PracticeCompliance', {
 	documentsRequired: { type: DataTypes.TEXT, allowNull: true },
 	yearsOfExperience: { type: DataTypes.INTEGER, allowNull: true },
 	skillsOrSoftwareRequired: { type: DataTypes.TEXT, allowNull: true },
+	complianceDocuments: { type: DataTypes.JSON, allowNull: true }, // Store array of document objects
 }, { tableName: 'practice_compliance', underscored: true });
 
 export default PracticeCompliance;

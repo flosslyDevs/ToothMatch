@@ -75,6 +75,16 @@ User.hasMany(PracticeLocation, { foreignKey: 'userId' });
 PracticeCompliance.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(PracticeCompliance, { foreignKey: 'userId' });
 
+// Practice Profile associations with related models
+PracticeProfile.hasMany(PracticeMedia, { foreignKey: 'userId', sourceKey: 'userId' });
+PracticeMedia.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+
+PracticeProfile.hasMany(PracticeLocation, { foreignKey: 'userId', sourceKey: 'userId' });
+PracticeLocation.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+
+PracticeProfile.hasOne(PracticeCompliance, { foreignKey: 'userId', sourceKey: 'userId' });
+PracticeCompliance.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+
 PracticePayment.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(PracticePayment, { foreignKey: 'userId' });
 
