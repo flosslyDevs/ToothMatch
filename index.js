@@ -9,6 +9,7 @@ import permanentJobRouter from './api/permanentJob.js';
 import profileRouter from './api/profile.js';
 import practiceRouter from './api/practice.js';
 import uploadRouter from './api/upload.js';
+import jobsRouter from './api/jobs.js';
 import path from 'path';
 
 const app = express();
@@ -23,6 +24,7 @@ app.use('/api/permanent-jobs', permanentJobRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/practice', practiceRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/jobs', jobsRouter);
 // Serve uploads folder statically
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 

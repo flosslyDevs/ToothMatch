@@ -95,9 +95,15 @@ User.hasOne(PracticeCulture, { foreignKey: 'userId' });
 LocumShift.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(LocumShift, { foreignKey: 'userId' });
 
+LocumShift.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+PracticeProfile.hasMany(LocumShift, { foreignKey: 'userId', sourceKey: 'userId' });
+
 // Permanent Job associations
 PermanentJob.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(PermanentJob, { foreignKey: 'userId' });
+
+PermanentJob.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+PracticeProfile.hasMany(PermanentJob, { foreignKey: 'userId', sourceKey: 'userId' });
 
 export {
 	User,

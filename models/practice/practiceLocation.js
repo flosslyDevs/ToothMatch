@@ -8,7 +8,11 @@ const PracticeLocation = sequelize?.define('PracticeLocation', {
 	phone: { type: DataTypes.STRING, allowNull: true },
 	parking: { type: DataTypes.STRING, allowNull: true },
 	publicTransport: { type: DataTypes.STRING, allowNull: true },
-	branchManagerUserId: { type: DataTypes.UUID, allowNull: true },
+	practiceManagerName: { type: DataTypes.STRING, allowNull: true },
+	email: { type: DataTypes.STRING, allowNull: true },
+	practiceManagerPhone: { type: DataTypes.STRING, allowNull: true },
+	// branchManagerUserId: { type: DataTypes.UUID, allowNull: true },
+
 }, { tableName: 'practice_locations', underscored: true });
 
 export default PracticeLocation;

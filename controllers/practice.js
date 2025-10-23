@@ -57,9 +57,9 @@ export async function createPracticeProfile(req, res) {
 		}
 
 		// Step 4: Compliance (create single row)
-		if (compliance) {
-			await PracticeCompliance.create({ ...compliance, userId });
-		}
+		// if (compliance) {
+		// 	await PracticeCompliance.create({ ...compliance, userId });
+		// }
 
 		// Step 5: Payment (create single row)
 		// if (payment) {
@@ -117,10 +117,10 @@ export async function upsertPracticeProfile(req, res) {
 		}
 
 		// Step 4: Compliance (single row upsert)
-		if (compliance) {
-			const [comp] = await PracticeCompliance.findOrCreate({ where: { userId }, defaults: { ...compliance, userId } });
-			await comp.update(compliance);
-		}
+		// if (compliance) {
+		// 	const [comp] = await PracticeCompliance.findOrCreate({ where: { userId }, defaults: { ...compliance, userId } });
+		// 	await comp.update(compliance);
+		// }
 
 		// Step 5: Payment (single row upsert)
 		// if (payment) {
@@ -146,10 +146,10 @@ export async function getPracticeProfile(req, res) {
 		const profile = await PracticeProfile.findOne({ where: { userId } });
 		const media = await PracticeMedia.findAll({ where: { userId } });
 		const locations = await PracticeLocation.findAll({ where: { userId } });
-		const compliance = await PracticeCompliance.findOne({ where: { userId } });
+		// const compliance = await PracticeCompliance.findOne({ where: { userId } });
 		// const payment = await PracticePayment.findOne({ where: { userId } });
 		// const culture = await PracticeCulture.findOne({ where: { userId } });
-		return res.status(200).json({ profile, media, locations, compliance });
+		return res.status(200).json({ profile, media, locations });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}
@@ -168,9 +168,9 @@ export async function getAllUserProfiles(req, res) {
 				{
 					model: PracticeLocation
 				},
-				{
-					model: PracticeCompliance
-				}
+				// {
+				// 	model: PracticeCompliance
+				// }
 			]
 		});
 		return res.status(200).json({ profiles });
@@ -191,9 +191,9 @@ export async function getSpecificPractice(req, res) {
 				{
 					model: PracticeLocation
 				},
-				{
-					model: PracticeCompliance
-				}
+				// {
+				// 	model: PracticeCompliance
+				// }
 			]
 		});
 		
