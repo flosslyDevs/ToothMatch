@@ -24,17 +24,31 @@ export async function uploadUserMedia(req, res) {
 export async function uploadUserDocument(req, res) {
 	const userId = req.user?.sub;
 	if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-	const file = req.file;
-	if (!file) return res.status(400).json({ message: 'No file uploaded' });
+	
+	// Handle both single file and multiple files
+	const files = req.files || (req.file ? [req.file] : []);
+	if (!files.length) return res.status(400).json({ message: 'No files uploaded' });
+	
 	const allowedTypes = ['passport', 'proof_of_address', 'professional_certificate'];
 	const type = (req.body?.type || '').toLowerCase();
 	if (!allowedTypes.includes(type)) {
 		return res.status(400).json({ message: `type must be one of: ${allowedTypes.join(', ')}` });
 	}
+	
 	try {
-		const url = buildFileUrl(req, file.path);
-		const document = await IdentityDocument.create({ userId, type, url });
-		return res.status(201).json({ document });
+		const documents = [];
+		for (const file of files) {
+			const url = buildFileUrl(req, file.path);
+			const document = await IdentityDocument.create({ userId, type, url });
+			documents.push(document);
+		}
+		
+		// Return single document if only one file, array if multiple
+		if (documents.length === 1) {
+			return res.status(201).json({ document: documents[0] });
+		} else {
+			return res.status(201).json({ documents });
+		}
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}

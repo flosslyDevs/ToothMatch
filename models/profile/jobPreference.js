@@ -10,6 +10,7 @@ const JobPreference = sequelize?.define('JobPreference', {
 	workingPattern: { type: DataTypes.STRING, allowNull: true },
 	payMin: { type: DataTypes.INTEGER, allowNull: true },
 	payMax: { type: DataTypes.INTEGER, allowNull: true },
+	hourlyRate: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
 	currentAddress: { type: DataTypes.STRING, allowNull: true },
 	latitude: { type: DataTypes.DECIMAL(10, 8), allowNull: true },
 	longitude: { type: DataTypes.DECIMAL(11, 8), allowNull: true },

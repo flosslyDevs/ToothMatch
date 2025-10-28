@@ -208,17 +208,17 @@ export async function getIdentityDocuments(req, res) {
 
 // Step 8: Job Preferences
 export async function updateJobPreferences(req, res) {
-	const { idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, preferredLocations, searchRadiusKm, salaryPreference } = req.body;
+	const { idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, hourlyRate, preferredLocations, searchRadiusKm, salaryPreference } = req.body;
 	const userId = req.user.sub;
 	
 	try {
 		const [preferences, created] = await JobPreference.findOrCreate({
 			where: { userId },
-			defaults: { userId, idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, preferredLocations, searchRadiusKm, salaryPreference }
+			defaults: { userId, idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, hourlyRate, preferredLocations, searchRadiusKm, salaryPreference }
 		});
 		
 		if (!created) {
-			await preferences.update({ idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, preferredLocations, searchRadiusKm, salaryPreference });
+			await preferences.update({ idealJobTitle, lookingFor, jobType, workingPattern, payMin, payMax, hourlyRate, preferredLocations, searchRadiusKm, salaryPreference });
 		}
 		
 		return res.status(200).json({ preferences });

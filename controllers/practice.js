@@ -18,7 +18,7 @@ export async function createPracticeProfile(req, res) {
 		// Step 2
 		website, instagram, facebook, linkedin, phoneNumber, hideFromPublic,
 		// Step 3
-		locations, // [{ address, phone, parking, publicTransport, branchManagerUserId }]
+		locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
 		// Step 4
 		compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
 		// Step 5
@@ -87,7 +87,7 @@ export async function upsertPracticeProfile(req, res) {
 		// Step 2
 		website, instagram, facebook, linkedin, phoneNumber, hideFromPublic,
 		// Step 3
-		locations, // [{ address, phone, parking, publicTransport, branchManagerUserId }]
+		locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
 		// Step 4
 		compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
 		// Step 5

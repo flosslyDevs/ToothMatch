@@ -31,7 +31,7 @@ export default router;
 
 // Authenticated uploads that also create DB records linked to the user
 router.post('/user/media', authMiddleware, upload.single('file'), uploadUserMedia);
-router.post('/user/document', authMiddleware, upload.single('file'), uploadUserDocument);
+router.post('/user/document', authMiddleware, upload.array('file', 10), uploadUserDocument);
 
 // Practice compliance document uploads
 router.post('/practice/compliance', authMiddleware, upload.single('file'), uploadPracticeComplianceDocument);
