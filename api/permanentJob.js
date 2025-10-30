@@ -11,6 +11,9 @@ import {
 
 const router = express.Router();
 
+// Public route (no auth required) - for candidates to browse
+router.get('/public/browse', getPublicPermanentJobs);
+
 // Practice routes (authenticated)
 router.use(authMiddleware);
 
@@ -28,8 +31,5 @@ router.put('/:id', updatePermanentJob);
 
 // Delete a permanent job
 router.delete('/:id', deletePermanentJob);
-
-// Public route (no auth required) - for candidates to browse
-router.get('/public/browse', getPublicPermanentJobs);
 
 export default router;
