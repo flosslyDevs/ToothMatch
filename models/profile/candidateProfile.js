@@ -10,6 +10,7 @@ const CandidateProfile = sequelize?.define('CandidateProfile', {
 	currentStatus: { type: DataTypes.STRING, allowNull: true },
 	linkedinUrl: { type: DataTypes.STRING, allowNull: true },
 	aboutMe: { type: DataTypes.TEXT, allowNull: true },
+	profileCompletion: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
 }, { tableName: 'candidate_profiles', underscored: true });
 
 export default CandidateProfile;

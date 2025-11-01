@@ -291,12 +291,14 @@ export async function updateCompleteProfile(req, res) {
 	} = req.body;
 
 	try {
+		// Get or create profile (needed for profileCompletion update at the end)
+		const [profile] = await CandidateProfile.findOrCreate({
+			where: { userId },
+			defaults: { userId, fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe }
+		});
+
 		// Step 1-2: Update/Create Profile
 		if (fullName || gender || jobTitle || currentStatus || linkedinUrl || aboutMe) {
-			const [profile] = await CandidateProfile.findOrCreate({
-				where: { userId },
-				defaults: { userId, fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe }
-			});
 			await profile.update({ fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe });
 		}
 
@@ -384,7 +386,10 @@ export async function updateCompleteProfile(req, res) {
 			await Promise.all(availabilitySlots.map(slot => AvailabilitySlot.create({ ...slot, userId })));
 		}
 
-		return res.status(200).json({ message: 'Profile updated successfully' });
+		// Update profileCompletion to true after successful profile update
+		await profile.update({ profileCompletion: true });
+
+		return res.status(200).json({ message: 'Profile updated successfully', profileCompletion: true });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}

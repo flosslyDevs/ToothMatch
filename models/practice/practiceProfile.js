@@ -13,6 +13,7 @@ const PracticeProfile = sequelize?.define('PracticeProfile', {
 	linkedin: { type: DataTypes.STRING, allowNull: true },
 	phoneNumber: { type: DataTypes.STRING, allowNull: true },
 	hideFromPublic: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+	profileCompletion: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
 }, { tableName: 'practice_profiles', underscored: true });
 
 export default PracticeProfile;

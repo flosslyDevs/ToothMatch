@@ -43,7 +43,8 @@ export async function createPracticeProfile(req, res) {
 			facebook, 
 			linkedin, 
 			phoneNumber, 
-			hideFromPublic 
+			hideFromPublic,
+			profileCompletion: true
 		});
 
 		// Step 1: Media (create all)
@@ -71,7 +72,7 @@ export async function createPracticeProfile(req, res) {
 		// 	await PracticeCulture.create({ ...culture, userId });
 		// }
 
-		return res.status(201).json({ message: 'Practice profile created successfully', profileId: profile.id });
+		return res.status(201).json({ message: 'Practice profile created successfully', profileId: profile.id, profileCompletion: true });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}
@@ -100,9 +101,9 @@ export async function upsertPracticeProfile(req, res) {
 		// Step 1 + 2: Basic practice profile & brand/contact
 		const [profile] = await PracticeProfile.findOrCreate({
 			where: { userId },
-			defaults: { userId, clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic }
+			defaults: { userId, clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, profileCompletion: true }
 		});
-		await profile.update({ clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic });
+		await profile.update({ clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, profileCompletion: true });
 
 		// Step 1: Media (replace all)
 		if (Array.isArray(media)) {
@@ -134,7 +135,7 @@ export async function upsertPracticeProfile(req, res) {
 		// 	await cul.update(culture);
 		// }
 
-		return res.status(200).json({ message: 'Practice profile saved' });
+		return res.status(200).json({ message: 'Practice profile saved', profileCompletion: true });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}
