@@ -270,6 +270,112 @@ export async function getAllSpecializations(req, res) {
 	}
 }
 
+// Complete Profile Create (All Steps in One)
+export async function createCompleteProfile(req, res) {
+    const userId = req.user.sub;
+    const {
+        // Step 1-2: Basic Profile
+        fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe,
+        // Step 3: Education & Experience
+        educations, workExperiences,
+        // Step 4: Work Personality
+        workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations,
+        // Step 5: Skills & Specializations
+        skillIds, specializationIds,
+        // Step 6: Media
+        media,
+        // Step 7: Identity Documents
+        documents,
+        // Step 8: Job Preferences & Availability
+        jobPreferences, availabilitySlots
+    } = req.body;
+
+    try {
+        // Do not allow duplicate profile creation
+        const existing = await CandidateProfile.findOne({ where: { userId } });
+        if (existing) {
+            return res.status(400).json({ message: 'Candidate profile already exists. Use PUT /api/profile/complete to update.' });
+        }
+
+        // Step 1-2: Create Profile
+        const profile = await CandidateProfile.create({
+            userId,
+            fullName,
+            gender,
+            jobTitle,
+            currentStatus,
+            linkedinUrl,
+            aboutMe,
+            profileCompletion: true
+        });
+
+        // Step 3: Educations
+        if (Array.isArray(educations) && educations.length > 0) {
+            await Promise.all(
+                educations.map(edu => Education.create({
+                    userId,
+                    highestLevel: edu?.highestLevel ?? null,
+                    institution: edu?.institution ?? null,
+                    fieldOfStudy: edu?.fieldOfStudy ?? null,
+                    startDate: edu?.startDate ?? null,
+                    endDate: edu?.endDate ?? null,
+                }))
+            );
+        }
+
+        // Step 3: Work Experiences
+        if (Array.isArray(workExperiences) && workExperiences.length > 0) {
+            const filteredExperiences = workExperiences.filter(exp => !!exp?.company);
+            await Promise.all(filteredExperiences.map(exp => WorkExperience.create({ ...exp, userId })));
+        }
+
+        // Step 4: Work Personality
+        if (workingSuperpower || favoriteWorkVibe || tacklingDifficultSituations) {
+            await WorkPersonality.create({ userId, workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations });
+        }
+
+        // Step 5: Skills
+        if (Array.isArray(skillIds) && skillIds.length > 0) {
+            for (const skillName of skillIds) {
+                const [skill] = await Skill.findOrCreate({ where: { name: skillName }, defaults: { name: skillName } });
+                await UserSkill.create({ userId, skillId: skill.id });
+            }
+        }
+
+        // Step 5: Specializations
+        if (Array.isArray(specializationIds) && specializationIds.length > 0) {
+            for (const specName of specializationIds) {
+                const [specialization] = await Specialization.findOrCreate({ where: { name: specName }, defaults: { name: specName } });
+                await UserSpecialization.create({ userId, specializationId: specialization.id });
+            }
+        }
+
+        // Step 6: Media
+        if (Array.isArray(media) && media.length > 0) {
+            await Promise.all(media.map(m => Media.create({ ...m, userId })));
+        }
+
+        // Step 7: Identity Documents
+        if (Array.isArray(documents) && documents.length > 0) {
+            await Promise.all(documents.map(doc => IdentityDocument.create({ ...doc, userId })));
+        }
+
+        // Step 8: Job Preferences
+        if (jobPreferences) {
+            await JobPreference.create({ ...jobPreferences, userId });
+        }
+
+        // Step 8: Availability Slots
+        if (Array.isArray(availabilitySlots) && availabilitySlots.length > 0) {
+            await Promise.all(availabilitySlots.map(slot => AvailabilitySlot.create({ ...slot, userId })));
+        }
+
+        return res.status(201).json({ message: 'Candidate profile created successfully', profileId: profile.id, profileCompletion: true });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+}
+
 // Complete Profile Update (All Steps in One)
 export async function updateCompleteProfile(req, res) {
 	const userId = req.user.sub;

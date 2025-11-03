@@ -20,7 +20,8 @@ import {
 	getAllSkills,
 	getAllSpecializations,
 	updateCompleteProfile,
-	getCompleteProfile
+	getCompleteProfile,
+	createCompleteProfile
 } from '../controllers/profile.js';
 
 const router = express.Router();
@@ -65,6 +66,7 @@ router.post('/availability', addAvailabilitySlot);
 router.get('/availability', getAvailabilitySlots);
 
 // Complete Profile (All Steps in One)
+router.post('/complete', createCompleteProfile);
 router.put('/complete', updateCompleteProfile);
 router.get('/complete', getCompleteProfile);
 

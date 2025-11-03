@@ -1,5 +1,5 @@
 import express from 'express';
-import { getPractitionerJobs, getAllActiveJobs, filterJobsForCandidates } from '../controllers/jobs.js';
+import { getPractitionerJobs, getAllActiveJobs, filterJobsForCandidates, filterCandidatesForPractices } from '../controllers/jobs.js';
 
 const router = express.Router();
 
@@ -11,5 +11,8 @@ router.get('/public/all', getAllActiveJobs);
 
 // Public route - Filter jobs for candidates with multiple filter options
 router.get('/public/filter', filterJobsForCandidates);
+
+// Public route - Filter candidates for practices
+router.get('/public/candidates/filter', filterCandidatesForPractices);
 
 export default router;

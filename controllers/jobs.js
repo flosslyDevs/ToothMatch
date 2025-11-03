@@ -1,4 +1,4 @@
-import { LocumShift, PermanentJob, User, PracticeProfile, PracticeLocation, JobPreference } from '../models/index.js';
+import { LocumShift, PermanentJob, User, PracticeProfile, PracticeLocation, PracticeMedia, JobPreference, CandidateProfile } from '../models/index.js';
 import { Op } from 'sequelize';
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
@@ -117,65 +117,110 @@ export async function getPractitionerJobs(req, res) {
 export async function getAllActiveJobs(req, res) {
 	try {
 		// Get all active locum shifts
-		const locumShifts = await LocumShift.findAll({
+        const locumShifts = await LocumShift.findAll({
 			where: { status: 'active' },
 			include: [
 				{
 					model: User,
 					attributes: ['id', 'fullName', 'email']
 				},
-				{
-					model: PracticeProfile,
-					attributes: ['clinicType', 'website', 'phoneNumber']
-				}
+                {
+                    model: PracticeProfile,
+                    attributes: ['clinicType', 'website', 'phoneNumber'],
+                    required: false,
+                    include: [
+                        {
+                            model: PracticeMedia,
+                            attributes: ['kind', 'url'],
+                            required: false
+                        }
+                    ]
+                }
 			],
 			order: [['createdAt', 'DESC']]
 		});
 
 		// Get all active permanent jobs
-		const permanentJobs = await PermanentJob.findAll({
+        const permanentJobs = await PermanentJob.findAll({
 			where: { status: 'active' },
 			include: [
 				{
 					model: User,
 					attributes: ['id', 'fullName', 'email']
 				},
-				{
-					model: PracticeProfile,
-					attributes: ['clinicType', 'website', 'phoneNumber']
-				}
+                {
+                    model: PracticeProfile,
+                    attributes: ['clinicType', 'website', 'phoneNumber'],
+                    required: false,
+                    include: [
+                        {
+                            model: PracticeMedia,
+                            attributes: ['kind', 'url'],
+                            required: false
+                        }
+                    ]
+                }
 			],
 			order: [['createdAt', 'DESC']]
 		});
 
 		// Transform locum shifts to include job type identifier
-		const transformedLocumShifts = locumShifts.map(shift => {
+        const transformedLocumShifts = locumShifts.map(shift => {
 			const shiftData = shift.toJSON();
 			// Remove the original User and PracticeProfile objects to avoid duplicates
 			delete shiftData.User;
 			delete shiftData.PracticeProfile;
-			return {
-				...shiftData,
-				jobType: 'locum',
-				jobTypeLabel: 'Locum Shift',
-				user: shift.User,
-				practiceProfile: shift.PracticeProfile
-			};
+            // derive avatar from practice media if available (prefer 'logo')
+            let avatar = null;
+            const pp = shift.PracticeProfile;
+            if (pp && pp.PracticeMedia && Array.isArray(pp.PracticeMedia)) {
+                const logo = pp.PracticeMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
+                const any = pp.PracticeMedia[0];
+                avatar = logo ? logo.url : (any ? any.url : null);
+            }
+            const practiceProfile = {
+                clinicType: pp?.clinicType ?? null,
+                website: pp?.website ?? null,
+                phoneNumber: pp?.phoneNumber ?? null,
+                PracticeMedia: Array.isArray(pp?.PracticeMedia) ? pp.PracticeMedia : [],
+                avatar
+            };
+            return {
+                ...shiftData,
+                jobType: 'locum',
+                jobTypeLabel: 'Locum Shift',
+                user: shift.User,
+                practiceProfile
+            };
 		});
 
 		// Transform permanent jobs to include job type identifier
-		const transformedPermanentJobs = permanentJobs.map(job => {
+        const transformedPermanentJobs = permanentJobs.map(job => {
 			const jobData = job.toJSON();
 			// Remove the original User and PracticeProfile objects to avoid duplicates
 			delete jobData.User;
 			delete jobData.PracticeProfile;
-			return {
-				...jobData,
-				jobType: 'permanent',
-				jobTypeLabel: 'Permanent Job',
-				user: job.User,
-				practiceProfile: job.PracticeProfile
-			};
+            let avatar = null;
+            const pp = job.PracticeProfile;
+            if (pp && pp.PracticeMedia && Array.isArray(pp.PracticeMedia)) {
+                const logo = pp.PracticeMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
+                const any = pp.PracticeMedia[0];
+                avatar = logo ? logo.url : (any ? any.url : null);
+            }
+            const practiceProfile = {
+                clinicType: pp?.clinicType ?? null,
+                website: pp?.website ?? null,
+                phoneNumber: pp?.phoneNumber ?? null,
+                PracticeMedia: Array.isArray(pp?.PracticeMedia) ? pp.PracticeMedia : [],
+                avatar
+            };
+            return {
+                ...jobData,
+                jobType: 'permanent',
+                jobTypeLabel: 'Permanent Job',
+                user: job.User,
+                practiceProfile
+            };
 		});
 
 		// Combine both types of jobs
@@ -472,4 +517,173 @@ export async function filterJobsForCandidates(req, res) {
 			error: error.message
 		});
 	}
+}
+
+// Filter candidates for practices with multiple filter options
+export async function filterCandidatesForPractices(req, res) {
+    try {
+        const {
+            jobType, // 'part-time', 'full-time', etc.
+            workingPattern, // 'day-shift', 'night-shift', etc.
+            payRangeMin, // 20
+            payRangeMax, // 50
+            salaryPreferenceMin, // 10
+            salaryPreferenceMax, // 50000
+            searchRadius, // miles
+            practiceLat, // practice latitude
+            practiceLng, // practice longitude
+            page = 1,
+            limit = 10
+        } = req.query;
+
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        // Fetch candidates with preferences
+        const candidates = await CandidateProfile.findAll({
+            include: [
+                {
+                    model: User,
+                    attributes: ['id', 'fullName', 'email'],
+                    include: [
+                        {
+                            model: JobPreference,
+                            attributes: [
+                                'jobType',
+                                'workingPattern',
+                                'payMin',
+                                'payMax',
+                                'hourlyRate',
+                                'salaryPreference',
+                                'latitude',
+                                'longitude',
+                                'searchRadiusKm'
+                            ]
+                        }
+                    ]
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        // In-memory filter (dataset expected small/medium). For large datasets, move to SQL where.
+        let filtered = candidates.filter(c => {
+            const pref = (c.User && c.User.JobPreference) ? c.User.JobPreference : {};
+
+            // jobType filter
+            if (jobType) {
+                if (!pref.jobType || !pref.jobType.toLowerCase().includes(String(jobType).toLowerCase())) return false;
+            }
+
+            // workingPattern filter
+            if (workingPattern) {
+                if (!pref.workingPattern || !pref.workingPattern.toLowerCase().includes(String(workingPattern).toLowerCase())) return false;
+            }
+
+            // pay range filter (use payMin/payMax or hourlyRate)
+            if (payRangeMin || payRangeMax) {
+                const minPay = parseFloat(payRangeMin) || 0;
+                const maxPay = parseFloat(payRangeMax) || Infinity;
+                const prefMin = Number(pref.payMin) || 0;
+                const prefMax = Number(pref.payMax) || 0;
+                const hr = Number(pref.hourlyRate) || 0;
+
+                const anyMatch = (
+                    (prefMin >= minPay && prefMin <= maxPay) ||
+                    (prefMax >= minPay && prefMax <= maxPay) ||
+                    (hr >= minPay && hr <= maxPay)
+                );
+                if (!anyMatch) return false;
+            }
+
+            // salary preference filter (parse numeric from salaryPreference string if present)
+            if (salaryPreferenceMin || salaryPreferenceMax) {
+                const minSal = parseFloat(salaryPreferenceMin) || 0;
+                const maxSal = parseFloat(salaryPreferenceMax) || Infinity;
+
+                let values = [];
+                if (pref.salaryPreference) {
+                    const nums = String(pref.salaryPreference).match(/[\d,]+/g);
+                    if (nums) {
+                        values = nums.map(n => Number(n.replace(/,/g, ''))).filter(v => !isNaN(v));
+                    }
+                }
+
+                // Fallback to payMin/payMax if salaryPreference not parsable
+                if (values.length === 0) {
+                    if (pref.payMin) values.push(Number(pref.payMin));
+                    if (pref.payMax) values.push(Number(pref.payMax));
+                }
+
+                if (values.length > 0) {
+                    const vMin = Math.min(...values);
+                    const vMax = Math.max(...values);
+                    if (!(vMin <= maxSal && vMax >= minSal)) return false;
+                }
+            }
+
+            return true;
+        });
+
+        // location-based filtering (practice coords vs candidate's pref coords)
+        if (practiceLat && practiceLng && searchRadius) {
+            const plat = parseFloat(practiceLat);
+            const plng = parseFloat(practiceLng);
+            const radius = parseFloat(searchRadius);
+
+            filtered = filtered.filter(c => {
+                const pref = (c.User && c.User.JobPreference) ? c.User.JobPreference : {};
+                const clat = pref.latitude != null ? parseFloat(pref.latitude) : NaN;
+                const clng = pref.longitude != null ? parseFloat(pref.longitude) : NaN;
+                if (isNaN(clat) || isNaN(clng)) return false;
+                const d = calculateDistance(plat, plng, clat, clng);
+                return d <= radius;
+            });
+        }
+
+        const total = filtered.length;
+        const paginated = filtered.slice(offset, offset + parseInt(limit));
+
+        // shape response
+        const results = paginated.map(c => {
+            const json = c.toJSON();
+            // keep only needed fields
+            return {
+                id: json.id,
+                userId: json.userId,
+                fullName: json.fullName,
+                jobTitle: json.jobTitle,
+                currentStatus: json.currentStatus,
+                linkedinUrl: json.linkedinUrl,
+                aboutMe: json.aboutMe,
+                user: json.User,
+                preferences: json.User ? json.User.JobPreference : null
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                totalCandidates: total,
+                candidates: results,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(total / parseInt(limit))
+                },
+                filters: {
+                    jobType: jobType || null,
+                    workingPattern: workingPattern || null,
+                    payRange: payRangeMin || payRangeMax ? { min: payRangeMin, max: payRangeMax } : null,
+                    salaryPreference: salaryPreferenceMin || salaryPreferenceMax ? { min: salaryPreferenceMin, max: salaryPreferenceMax } : null,
+                    searchRadius: practiceLat && practiceLng && searchRadius ? { miles: searchRadius, practiceLat, practiceLng } : null
+                }
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Error filtering candidates',
+            error: error.message
+        });
+    }
 }

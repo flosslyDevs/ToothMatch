@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { upload } from '../utils/upload.js';
 import { authMiddleware } from '../utils/auth.js';
-import { uploadUserMedia, uploadUserDocument, uploadPracticeComplianceDocument } from '../controllers/upload.js';
+import { uploadUserMedia, uploadPracticeMedia, uploadUserDocument, uploadPracticeComplianceDocument } from '../controllers/upload.js';
 
 const router = express.Router();
 
@@ -31,6 +31,7 @@ export default router;
 
 // Authenticated uploads that also create DB records linked to the user
 router.post('/user/media', authMiddleware, upload.single('file'), uploadUserMedia);
+router.post('/practice/media', authMiddleware, upload.single('file'), uploadPracticeMedia);
 router.post('/user/document', authMiddleware, upload.array('file', 10), uploadUserDocument);
 
 // Practice compliance document uploads
