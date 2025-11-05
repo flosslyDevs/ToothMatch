@@ -19,6 +19,8 @@ import PracticePayment from './practice/practicePayment.js';
 import PracticeCulture from './practice/practiceCulture.js';
 import LocumShift from './practice/locumShift.js';
 import PermanentJob from './practice/permanentJob.js';
+import MatchLike from './match/matchLike.js';
+import Match from './match/match.js';
 
 // Associations
 CandidateProfile.belongsTo(User, { foreignKey: 'userId' });
@@ -126,7 +128,9 @@ export {
 	PracticePayment,
 	PracticeCulture,
 	LocumShift,
-	PermanentJob,
+    PermanentJob,
+    MatchLike,
+    Match,
 };
 
 
