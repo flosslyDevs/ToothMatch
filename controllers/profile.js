@@ -1,10 +1,13 @@
 import { 
 	CandidateProfile, 
+	PracticeProfile,
 	Education, 
 	WorkExperience, 
 	WorkPersonality, 
 	Skill, 
 	Specialization, 
+	PracticeMedia,
+	PracticeLocation,
 	UserSkill, 
 	UserSpecialization, 
 	Media, 
@@ -268,6 +271,69 @@ export async function getAllSpecializations(req, res) {
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}
+}
+
+// Unified profile fetch for either candidate or practice based on kind or auto-detect
+export async function getUnifiedProfile(req, res) {
+    const userId = req.user.sub;
+    const { kind } = req.query; // optional: 'candidate' | 'practice'
+
+    try {
+        let resolvedKind = (kind || '').toLowerCase();
+
+        if (resolvedKind !== 'candidate' && resolvedKind !== 'practice') {
+            // auto-detect: prefer practice if exists, else candidate
+            const practice = await PracticeProfile.findOne({ where: { userId } });
+            if (practice) {
+                resolvedKind = 'practice';
+            } else {
+                resolvedKind = 'candidate';
+            }
+        }
+
+        if (resolvedKind === 'candidate') {
+            // Reuse logic from getCompleteProfile
+            const profile = await CandidateProfile.findOne({ where: { userId } });
+            const educations = await Education.findAll({ where: { userId } });
+            const workExperiences = await WorkExperience.findAll({ where: { userId } });
+            const personality = await WorkPersonality.findOne({ where: { userId } });
+            const media = await Media.findAll({ where: { userId } });
+            const documents = await IdentityDocument.findAll({ where: { userId } });
+            const jobPreferences = await JobPreference.findOne({ where: { userId } });
+            const availabilitySlots = await AvailabilitySlot.findAll({ where: { userId } });
+
+            const userSkills = await UserSkill.findAll({ where: { userId }, include: [{ model: Skill }] });
+            const userSpecializations = await UserSpecialization.findAll({ where: { userId }, include: [{ model: Specialization }] });
+
+            return res.status(200).json({
+                kind: 'candidate',
+                profile,
+                educations,
+                workExperiences,
+                personality,
+                skills: userSkills,
+                specializations: userSpecializations,
+                media,
+                documents,
+                jobPreferences,
+                availabilitySlots
+            });
+        }
+
+        // practice
+        const practiceProfile = await PracticeProfile.findOne({ where: { userId } });
+        const practiceMedia = await PracticeMedia.findAll({ where: { userId } });
+        const practiceLocations = await PracticeLocation.findAll({ where: { userId } });
+
+        return res.status(200).json({
+            kind: 'practice',
+            profile: practiceProfile,
+            media: practiceMedia,
+            locations: practiceLocations
+        });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
 }
 
 // Complete Profile Create (All Steps in One)

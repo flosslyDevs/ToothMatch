@@ -21,6 +21,7 @@ import {
 	getAllSpecializations,
 	updateCompleteProfile,
 	getCompleteProfile,
+	getUnifiedProfile,
 	createCompleteProfile
 } from '../controllers/profile.js';
 
@@ -69,5 +70,8 @@ router.get('/availability', getAvailabilitySlots);
 router.post('/complete', createCompleteProfile);
 router.put('/complete', updateCompleteProfile);
 router.get('/complete', getCompleteProfile);
+
+// Unified (candidate or practice) based on kind or auto-detect
+router.get('/me', getUnifiedProfile);
 
 export default router;
