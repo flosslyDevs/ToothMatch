@@ -14,7 +14,7 @@ const JobPreference = sequelize?.define('JobPreference', {
 	currentAddress: { type: DataTypes.STRING, allowNull: true },
 	latitude: { type: DataTypes.DECIMAL(10, 8), allowNull: true },
 	longitude: { type: DataTypes.DECIMAL(11, 8), allowNull: true },
-	searchRadiusKm: { type: DataTypes.INTEGER, allowNull: true },
+	searchRadiusKm: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
 	salaryPreference: { type: DataTypes.STRING, allowNull: true },
 }, { tableName: 'job_preferences', underscored: true });
 

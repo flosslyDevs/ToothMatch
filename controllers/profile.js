@@ -325,9 +325,22 @@ export async function getUnifiedProfile(req, res) {
         const practiceMedia = await PracticeMedia.findAll({ where: { userId } });
         const practiceLocations = await PracticeLocation.findAll({ where: { userId } });
 
+        // Extract logo from media (prefer kind='logo', else first item)
+        let logo = null;
+        if (practiceMedia && practiceMedia.length > 0) {
+            const logoMedia = practiceMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
+            logo = logoMedia ? logoMedia.url : (practiceMedia[0] ? practiceMedia[0].url : null);
+        }
+
+        // Add logo to profile object
+        const profileWithLogo = practiceProfile ? {
+            ...practiceProfile.toJSON(),
+            logo
+        } : null;
+
         return res.status(200).json({
             kind: 'practice',
-            profile: practiceProfile,
+            profile: profileWithLogo,
             media: practiceMedia,
             locations: practiceLocations
         });
