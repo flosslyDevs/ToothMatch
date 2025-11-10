@@ -22,12 +22,16 @@ import {
 	updateCompleteProfile,
 	getCompleteProfile,
 	getUnifiedProfile,
-	createCompleteProfile
+	createCompleteProfile,
+	getCandidateById
 } from '../controllers/profile.js';
 
 const router = express.Router();
 
-// Apply auth middleware to all routes
+// Public route - Get candidate by ID (for practices to view candidates)
+router.get('/candidate/:id', getCandidateById);
+
+// Apply auth middleware to all routes below
 router.use(authMiddleware);
 
 // Step 1-2: Basic Profile

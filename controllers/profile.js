@@ -620,3 +620,60 @@ export async function getCompleteProfile(req, res) {
 		return res.status(500).json({ message: error.message });
 	}
 }
+
+// Get Candidate by ID (Public - for practices to view candidates)
+export async function getCandidateById(req, res) {
+	const { id } = req.params; // Can be userId or candidate profile id
+	
+	try {
+		// Try to find by candidate profile id first
+		let profile = await CandidateProfile.findByPk(id);
+		let userId = null;
+		
+		if (profile) {
+			userId = profile.userId;
+		} else {
+			// If not found, assume it's a userId
+			userId = id;
+			profile = await CandidateProfile.findOne({ where: { userId } });
+		}
+		
+		if (!profile) {
+			return res.status(404).json({ message: 'Candidate not found' });
+		}
+		
+		// Get all candidate data
+		const educations = await Education.findAll({ where: { userId } });
+		const workExperiences = await WorkExperience.findAll({ where: { userId } });
+		const personality = await WorkPersonality.findOne({ where: { userId } });
+		const media = await Media.findAll({ where: { userId } });
+		const documents = await IdentityDocument.findAll({ where: { userId } });
+		const jobPreferences = await JobPreference.findOne({ where: { userId } });
+		const availabilitySlots = await AvailabilitySlot.findAll({ where: { userId } });
+
+		// Get user skills and specializations with names
+		const userSkills = await UserSkill.findAll({ 
+			where: { userId },
+			include: [{ model: Skill }]
+		});
+		const userSpecializations = await UserSpecialization.findAll({ 
+			where: { userId },
+			include: [{ model: Specialization }]
+		});
+
+		return res.status(200).json({
+			profile,
+			educations,
+			workExperiences,
+			personality,
+			skills: userSkills,
+			specializations: userSpecializations,
+			media,
+			documents,
+			jobPreferences,
+			availabilitySlots
+		});
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
