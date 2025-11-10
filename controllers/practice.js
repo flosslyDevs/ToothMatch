@@ -180,11 +180,12 @@ export async function getAllUserProfiles(req, res) {
 	}
 }
 
-// Get a specific practice profile by ID
+// Get a specific practice profile by ID (Public - for candidates to view practices)
 export async function getSpecificPractice(req, res) {
 	const { practiceId } = req.params;
 	try {
-		const profile = await PracticeProfile.findByPk(practiceId, {
+		// Try to find by practice profile id first
+		let profile = await PracticeProfile.findByPk(practiceId, {
 			include: [
 				{
 					model: PracticeMedia
@@ -198,11 +199,44 @@ export async function getSpecificPractice(req, res) {
 			]
 		});
 		
+		// If not found by profile ID, try by userId
+		if (!profile) {
+			profile = await PracticeProfile.findOne({
+				where: { userId: practiceId },
+				include: [
+					{
+						model: PracticeMedia
+					},
+					{
+						model: PracticeLocation
+					}
+				]
+			});
+		}
+		
 		if (!profile) {
 			return res.status(404).json({ message: 'Practice profile not found' });
 		}
 		
-		return res.status(200).json({ profile });
+		// Extract logo from media (prefer kind='logo', else first item)
+		const practiceMedia = profile.PracticeMedia || [];
+		let logo = null;
+		if (practiceMedia.length > 0) {
+			const logoMedia = practiceMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
+			logo = logoMedia ? logoMedia.url : (practiceMedia[0] ? practiceMedia[0].url : null);
+		}
+		
+		// Add logo to profile object
+		const profileWithLogo = {
+			...profile.toJSON(),
+			logo
+		};
+		
+		return res.status(200).json({ 
+			profile: profileWithLogo,
+			media: practiceMedia,
+			locations: profile.PracticeLocation || []
+		});
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}
