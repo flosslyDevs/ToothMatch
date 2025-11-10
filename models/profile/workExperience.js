@@ -9,7 +9,7 @@ const WorkExperience = sequelize?.define('WorkExperience', {
 	startDate: { type: DataTypes.DATEONLY, allowNull: true },
 	endDate: { type: DataTypes.DATEONLY, allowNull: true },
 	isCurrent: { type: DataTypes.BOOLEAN, defaultValue: false },
-	yearsExperience: { type: DataTypes.INTEGER, allowNull: true },
+	yearsExperience: { type: DataTypes.STRING, allowNull: true },
 	professionalRegNumber: { type: DataTypes.STRING, allowNull: true },
 }, { tableName: 'work_experiences', underscored: true });
 

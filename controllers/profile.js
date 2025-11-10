@@ -305,9 +305,22 @@ export async function getUnifiedProfile(req, res) {
             const userSkills = await UserSkill.findAll({ where: { userId }, include: [{ model: Skill }] });
             const userSpecializations = await UserSpecialization.findAll({ where: { userId }, include: [{ model: Specialization }] });
 
+            // Extract logo from media (prefer kind='logo', else first item)
+            let logo = null;
+            if (media && media.length > 0) {
+                const logoMedia = media.find(m => (m.kind || '').toLowerCase() === 'logo');
+                logo = logoMedia ? logoMedia.url : (media[0] ? media[0].url : null);
+            }
+
+            // Add logo to profile object
+            const profileWithLogo = profile ? {
+                ...profile.toJSON(),
+                logo
+            } : null;
+
             return res.status(200).json({
                 kind: 'candidate',
-                profile,
+                profile: profileWithLogo,
                 educations,
                 workExperiences,
                 personality,
@@ -604,8 +617,21 @@ export async function getCompleteProfile(req, res) {
 			include: [{ model: Specialization }]
 		});
 
+		// Extract logo from media (prefer kind='logo', else first item)
+		let logo = null;
+		if (media && media.length > 0) {
+			const logoMedia = media.find(m => (m.kind || '').toLowerCase() === 'logo');
+			logo = logoMedia ? logoMedia.url : (media[0] ? media[0].url : null);
+		}
+
+		// Add logo to profile object
+		const profileWithLogo = profile ? {
+			...profile.toJSON(),
+			logo
+		} : null;
+
 		return res.status(200).json({
-			profile,
+			profile: profileWithLogo,
 			educations,
 			workExperiences,
 			personality,
@@ -661,8 +687,21 @@ export async function getCandidateById(req, res) {
 			include: [{ model: Specialization }]
 		});
 
+		// Extract logo from media (prefer kind='logo', else first item)
+		let logo = null;
+		if (media && media.length > 0) {
+			const logoMedia = media.find(m => (m.kind || '').toLowerCase() === 'logo');
+			logo = logoMedia ? logoMedia.url : (media[0] ? media[0].url : null);
+		}
+
+		// Add logo to profile object
+		const profileWithLogo = profile ? {
+			...profile.toJSON(),
+			logo
+		} : null;
+
 		return res.status(200).json({
-			profile,
+			profile: profileWithLogo,
 			educations,
 			workExperiences,
 			personality,
