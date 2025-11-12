@@ -29,12 +29,49 @@ router.post('/multiple', upload.array('files', 10), async (req, res) => {
 
 export default router;
 
+// Error handling middleware for multer errors
+const handleMulterError = (err, req, res, next) => {
+	if (err) {
+		if (err.code === 'LIMIT_FILE_COUNT') {
+			return res.status(400).json({ message: 'Too many files. Maximum 5 files allowed.' });
+		}
+		if (err.code === 'LIMIT_FILE_SIZE') {
+			return res.status(400).json({ message: 'File too large. Please check file size limits.' });
+		}
+		if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+			// If the unexpected field is 'file', it means multer.array was used but single file was sent
+			// or vice versa. Provide helpful message.
+			if (err.field === 'file') {
+				return res.status(400).json({ 
+					message: 'Field name mismatch. For multiple files, use field name "file" and send multiple files with the same field name.',
+					hint: 'Example: formData.append("file", file1); formData.append("file", file2);'
+				});
+			}
+			return res.status(400).json({ message: `Unexpected field: ${err.field}. Please use 'file' as the field name for file uploads.` });
+		}
+		return res.status(400).json({ message: err.message || 'File upload error' });
+	}
+	next();
+};
+
+// Wrapper to handle multer errors properly
+const handleUpload = (multerMiddleware, controller) => {
+	return (req, res, next) => {
+		multerMiddleware(req, res, (err) => {
+			if (err) {
+				return handleMulterError(err, req, res, next);
+			}
+			controller(req, res, next);
+		});
+	};
+};
+
 // Authenticated uploads that also create DB records linked to the user
-router.post('/user/media', authMiddleware, upload.single('file'), uploadUserMedia);
-router.post('/practice/media', authMiddleware, upload.single('file'), uploadPracticeMedia);
-router.post('/user/document', authMiddleware, upload.array('file', 10), uploadUserDocument);
+router.post('/user/media', authMiddleware, handleUpload(upload.single('file'), uploadUserMedia));
+router.post('/practice/media', authMiddleware, handleUpload(upload.array('file', 5), uploadPracticeMedia));
+router.post('/user/document', authMiddleware, handleUpload(upload.array('file', 5), uploadUserDocument));
 
 // Practice compliance document uploads
-router.post('/practice/compliance', authMiddleware, upload.single('file'), uploadPracticeComplianceDocument);
+router.post('/practice/compliance', authMiddleware, handleUpload(upload.single('file'), uploadPracticeComplianceDocument));
 
 

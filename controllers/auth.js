@@ -14,22 +14,45 @@ export async function signupRequest(event) {
 	if (!email || !fullName || !password) {
 		return { status: 400, body: { message: 'Missing required fields' } };
 	}
-	const existing = await User.findOne({ where: { email } });
+	try {
+		const existing = await User.findOne({ where: { email } });
 	if (existing) {
 		return { status: 409, body: { message: 'Email already registered' } };
 	}
-	const passwordHash = await bcrypt.hash(password, 10);
-	const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-	const user = await User.create({ 
-		email, 
-		fullName, 
-		mobileNumber, 
-		passwordHash, 
-		verificationCode,
-		role: role === 'practice' ? 'practice' : 'candidate'
-	});
-	await sendVerificationEmail(email, verificationCode);
-	return { status: 201, body: { id: user.id, email: user.email, role: user.role } };
+		const passwordHash = await bcrypt.hash(password, 10);
+		const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+		const user = await User.create({ 
+			email, 
+			fullName, 
+			mobileNumber, 
+			passwordHash, 
+			verificationCode,
+			role: role === 'practice' ? 'practice' : 'candidate'
+		});
+		let emailSendFailed = false;
+		let emailError = null;
+		try {
+			await sendVerificationEmail(email, verificationCode);
+		} catch (err) {
+			emailSendFailed = true;
+			emailError = err?.message || err?.originalError || 'Email service unavailable';
+			// Do not block signup on email failure
+			// eslint-disable-next-line no-console
+			console.error('Signup email send failed:', emailError);
+		}
+		return { 
+			status: 201, 
+			body: { 
+				id: user.id, 
+				email: user.email, 
+				role: user.role, 
+				emailSendFailed,
+				...(emailSendFailed && emailError ? { emailError } : {})
+			} 
+		};
+	} catch (error) {
+		return { status: 500, body: { message: 'Unable to complete signup', error: error?.message || String(error) } };
+	}
 }
 
 export async function verifyEmail(event) {
@@ -130,15 +153,35 @@ export async function forgetPasswordRequest(event) {
 	if (!email) {
 		return { status: 400, body: { message: 'Email is required' } };
 	}
-	const user = await User.findOne({ where: { email } });
-	if (!user) {
-		return { status: 404, body: { message: 'User not found' } };
+	try {
+		const user = await User.findOne({ where: { email } });
+		if (!user) {
+			return { status: 404, body: { message: 'User not found' } };
+		}
+		const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+		user.verificationCode = resetCode;
+		await user.save();
+		let emailSendFailed = false;
+		let emailError = null;
+		try {
+			await sendVerificationEmail(email, resetCode);
+		} catch (err) {
+			emailSendFailed = true;
+			emailError = err?.message || err?.originalError || 'Email service unavailable';
+			// eslint-disable-next-line no-console
+			console.error('Forgot password email send failed:', emailError);
+		}
+		return { 
+			status: 200, 
+			body: { 
+				message: 'Reset code processed', 
+				emailSendFailed,
+				...(emailSendFailed && emailError ? { emailError } : {})
+			} 
+		};
+	} catch (error) {
+		return { status: 500, body: { message: 'Unable to process reset code', error: error?.message || String(error) } };
 	}
-	const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-	user.verificationCode = resetCode;
-	await user.save();
-	await sendVerificationEmail(email, resetCode);
-	return { status: 200, body: { message: 'Reset code sent to email' } };
 }
 
 export async function resetPassword(event) {
@@ -167,25 +210,39 @@ export async function resendOtp(event) {
 	if (!email) {
 		return { status: 400, body: { message: 'Email is required' } };
 	}
-	
-	const user = await User.findOne({ where: { email } });
-	if (!user) {
-		return { status: 404, body: { message: 'User not found' } };
+	try {
+		const user = await User.findOne({ where: { email } });
+		if (!user) {
+			return { status: 404, body: { message: 'User not found' } };
+		}
+		if (user.isEmailVerified) {
+			return { status: 400, body: { message: 'Email is already verified' } };
+		}
+		// Generate new verification code
+		const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+		user.verificationCode = verificationCode;
+		await user.save();
+		let emailSendFailed = false;
+		let emailError = null;
+		try {
+			await sendVerificationEmail(email, verificationCode);
+		} catch (err) {
+			emailSendFailed = true;
+			emailError = err?.message || err?.originalError || 'Email service unavailable';
+			// eslint-disable-next-line no-console
+			console.error('Resend OTP email send failed:', emailError);
+		}
+		return { 
+			status: 200, 
+			body: { 
+				message: 'OTP processed', 
+				emailSendFailed,
+				...(emailSendFailed && emailError ? { emailError } : {})
+			} 
+		};
+	} catch (error) {
+		return { status: 500, body: { message: 'Unable to resend OTP', error: error?.message || String(error) } };
 	}
-	
-	if (user.isEmailVerified) {
-		return { status: 400, body: { message: 'Email is already verified' } };
-	}
-	
-	// Generate new verification code
-	const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-	user.verificationCode = verificationCode;
-	await user.save();
-	
-	// Send verification email
-	await sendVerificationEmail(email, verificationCode);
-	
-	return { status: 200, body: { message: 'OTP resent successfully' } };
 }
 
 export async function profile() { return { status: 501, body: { message: 'Not implemented' } }; }

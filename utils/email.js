@@ -29,6 +29,15 @@ export async function sendVerificationEmail(to, code) {
 		return await transporter.sendMail(mail);
 	} catch (error) {
 		console.log(`\n📧 Email failed, verification code for ${to}: ${code}\n`);
+		
+		// Provide helpful error message for Gmail 2FA issues
+		if (error.message && error.message.includes('BadCredentials')) {
+			const helpfulError = new Error('Gmail authentication failed. With 2FA enabled, you must use an App Password instead of your regular password. Go to: https://myaccount.google.com/apppasswords');
+			helpfulError.originalError = error.message;
+			helpfulError.code = 'SMTP_AUTH_FAILED';
+			throw helpfulError;
+		}
+		
 		throw error;
 	}
 }

@@ -8,6 +8,7 @@ import {
 	Specialization, 
 	PracticeMedia,
 	PracticeLocation,
+	PracticeCompliance,
 	UserSkill, 
 	UserSpecialization, 
 	Media, 
@@ -337,6 +338,10 @@ export async function getUnifiedProfile(req, res) {
         const practiceProfile = await PracticeProfile.findOne({ where: { userId } });
         const practiceMedia = await PracticeMedia.findAll({ where: { userId } });
         const practiceLocations = await PracticeLocation.findAll({ where: { userId } });
+        const practiceCompliance = await PracticeCompliance.findOne({ where: { userId } });
+        
+        // Also check IdentityDocument table (in case documents were uploaded via /api/upload/user/document)
+        const identityDocuments = await IdentityDocument.findAll({ where: { userId } });
 
         // Extract logo from media (prefer kind='logo', else first item)
         let logo = null;
@@ -351,11 +356,16 @@ export async function getUnifiedProfile(req, res) {
             logo
         } : null;
 
+        // Combine compliance documents and identity documents
+        const complianceDocuments = practiceCompliance?.complianceDocuments || [];
+        const allDocuments = [...complianceDocuments, ...identityDocuments.map(doc => doc.toJSON())];
+
         return res.status(200).json({
             kind: 'practice',
             profile: profileWithLogo,
             media: practiceMedia,
-            locations: practiceLocations
+            locations: practiceLocations,
+            documents: allDocuments
         });
     } catch (error) {
         return res.status(500).json({ message: error.message });

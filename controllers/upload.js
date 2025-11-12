@@ -25,14 +25,33 @@ export async function uploadUserMedia(req, res) {
 export async function uploadPracticeMedia(req, res) {
     const userId = req.user?.sub;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
-    const file = req.file;
-    if (!file) return res.status(400).json({ message: 'No file uploaded' });
-    const { kind } = req.body; // e.g., 'logo', 'avatar', 'clinic_photo'
+    
+    // Handle both single file and multiple files
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files.length) return res.status(400).json({ message: 'No files uploaded' });
+    
+    // Check file limit (max 5 files)
+    if (files.length > 5) {
+        return res.status(400).json({ message: 'Maximum 5 files allowed per request' });
+    }
+    
+    const { kind } = req.body; // e.g., 'logo', 'clinic_photo', 'team_photo'
     if (!kind) return res.status(400).json({ message: 'kind is required' });
+    
     try {
-        const url = buildFileUrl(req, file.path);
-        const media = await PracticeMedia.create({ userId, kind, url });
-        return res.status(201).json({ media });
+        const mediaItems = [];
+        for (const file of files) {
+            const url = buildFileUrl(req, file.path);
+            const media = await PracticeMedia.create({ userId, kind, url });
+            mediaItems.push(media);
+        }
+        
+        // Return single media if only one file, array if multiple
+        if (mediaItems.length === 1) {
+            return res.status(201).json({ media: mediaItems[0] });
+        } else {
+            return res.status(201).json({ media: mediaItems });
+        }
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }
@@ -45,6 +64,11 @@ export async function uploadUserDocument(req, res) {
 	// Handle both single file and multiple files
 	const files = req.files || (req.file ? [req.file] : []);
 	if (!files.length) return res.status(400).json({ message: 'No files uploaded' });
+	
+	// Check file limit (max 5 files)
+	if (files.length > 5) {
+		return res.status(400).json({ message: 'Maximum 5 files allowed per request' });
+	}
 	
 	const allowedTypes = ['passport', 'proof_of_address', 'professional_certificate'];
 	const type = (req.body?.type || '').toLowerCase();
