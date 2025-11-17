@@ -97,44 +97,78 @@ export async function login(event) {
 export async function googleAuth(event) {
 	const { idToken, fullName, mobileNumber, role } = getBody(event);
 	if (!idToken) return { status: 400, body: { message: 'Missing idToken' } };
-	const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-	const ticket = await client.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
-	const payload = ticket.getPayload();
-	const email = payload.email;
-	const sub = payload.sub;
-	let user = await User.findOne({ where: { oauthProvider: 'google', oauthSubject: sub } });
-	if (!user) {
-		user = await User.findOne({ where: { email } });
-	}
-	if (!user) {
-		user = await User.create({
-			email,
-			fullName: fullName || payload.name || email,
-			mobileNumber: mobileNumber || null,
-			isEmailVerified: true,
-			oauthProvider: 'google',
-			oauthSubject: sub,
-			role: role === 'practice' ? 'practice' : 'candidate',
-		});
-	} else {
-		user.oauthProvider = 'google';
-		user.oauthSubject = sub;
-		if (!user.isEmailVerified) user.isEmailVerified = true;
-		await user.save();
+	
+	// Validate that idToken looks like a JWT (should have 3 segments separated by dots)
+	const tokenSegments = idToken.split('.');
+	if (tokenSegments.length !== 3) {
+		return { 
+			status: 400, 
+			body: { 
+				message: 'Invalid idToken format. Expected a JWT token with 3 segments.',
+				hint: 'Make sure you are sending the idToken from GoogleSignIn authentication result, not the Client ID or access token.'
+			} 
+		};
 	}
 	
-	// Check if profile is complete
-	let isProfileComplete = false;
-	if (user.role === 'candidate') {
-		const profile = await CandidateProfile.findOne({ where: { userId: user.id } });
-		isProfileComplete = profile?.profileCompletion === true;
-	} else if (user.role === 'practice') {
-		const profile = await PracticeProfile.findOne({ where: { userId: user.id } });
-		isProfileComplete = profile?.profileCompletion === true;
+	try {
+		const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+		const ticket = await client.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
+		const payload = ticket.getPayload();
+		const email = payload.email;
+		const sub = payload.sub;
+		let user = await User.findOne({ where: { oauthProvider: 'google', oauthSubject: sub } });
+		if (!user) {
+			user = await User.findOne({ where: { email } });
+		}
+		if (!user) {
+			user = await User.create({
+				email,
+				fullName: fullName || payload.name || email,
+				mobileNumber: mobileNumber || null,
+				isEmailVerified: true,
+				oauthProvider: 'google',
+				oauthSubject: sub,
+				role: role === 'practice' ? 'practice' : 'candidate',
+			});
+		} else {
+			user.oauthProvider = 'google';
+			user.oauthSubject = sub;
+			if (!user.isEmailVerified) user.isEmailVerified = true;
+			await user.save();
+		}
+		
+		// Check if profile is complete
+		let isProfileComplete = false;
+		if (user.role === 'candidate') {
+			const profile = await CandidateProfile.findOne({ where: { userId: user.id } });
+			isProfileComplete = profile?.profileCompletion === true;
+		} else if (user.role === 'practice') {
+			const profile = await PracticeProfile.findOne({ where: { userId: user.id } });
+			isProfileComplete = profile?.profileCompletion === true;
+		}
+		
+		const token = signUserToken(user);
+		return { status: 200, body: { token, user: { id: user.id, email: user.email, role: user.role }, isProfileComplete } };
+	} catch (error) {
+		// Handle JWT verification errors
+		if (error.message && error.message.includes('Wrong number of segments')) {
+			return { 
+				status: 400, 
+				body: { 
+					message: 'Invalid idToken format. The token must be a valid JWT with 3 segments.',
+					error: error.message,
+					hint: 'Ensure you are sending the idToken from GoogleSignIn.signIn() result, not the Client ID or access token. Example: GoogleSignInAuthentication.idToken'
+				} 
+			};
+		}
+		return { 
+			status: 401, 
+			body: { 
+				message: 'Google authentication failed', 
+				error: error.message 
+			} 
+		};
 	}
-	
-	const token = signUserToken(user);
-	return { status: 200, body: { token, user: { id: user.id, email: user.email, role: user.role }, isProfileComplete } };
 }
 
 // Apple OAuth signup/login
