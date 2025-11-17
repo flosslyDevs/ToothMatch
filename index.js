@@ -11,6 +11,7 @@ import practiceRouter from './api/practice.js';
 import uploadRouter from './api/upload.js';
 import jobsRouter from './api/jobs.js';
 import matchRouter from './api/match.js';
+import interviewRouter from './api/interview.js';
 import path from 'path';
 
 const app = express();
@@ -27,6 +28,7 @@ app.use('/api/practice', practiceRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/match', matchRouter);
+app.use('/api/interview', interviewRouter);
 // Serve uploads folder statically
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 

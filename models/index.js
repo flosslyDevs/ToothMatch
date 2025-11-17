@@ -19,6 +19,7 @@ import PracticePayment from './practice/practicePayment.js';
 import PracticeCulture from './practice/practiceCulture.js';
 import LocumShift from './practice/locumShift.js';
 import PermanentJob from './practice/permanentJob.js';
+import Interview from './practice/interview.js';
 import MatchLike from './match/matchLike.js';
 import Match from './match/match.js';
 
@@ -107,6 +108,12 @@ User.hasMany(PermanentJob, { foreignKey: 'userId' });
 PermanentJob.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
 PracticeProfile.hasMany(PermanentJob, { foreignKey: 'userId', sourceKey: 'userId' });
 
+// Interview associations
+Interview.belongsTo(User, { foreignKey: 'practiceUserId', as: 'Practice' });
+Interview.belongsTo(User, { foreignKey: 'candidateUserId', as: 'Candidate' });
+User.hasMany(Interview, { foreignKey: 'practiceUserId', as: 'ScheduledInterviews' });
+User.hasMany(Interview, { foreignKey: 'candidateUserId', as: 'CandidateInterviews' });
+
 export {
 	User,
 	CandidateProfile,
@@ -129,6 +136,7 @@ export {
 	PracticeCulture,
 	LocumShift,
     PermanentJob,
+    Interview,
     MatchLike,
     Match,
 };
