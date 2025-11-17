@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import User from '../models/auth/users.js';
+import { CandidateProfile, PracticeProfile } from '../models/index.js';
 import { sendVerificationEmail } from '../utils/email.js';
 import { signUserToken } from '../utils/jwt.js';
 import { OAuth2Client } from 'google-auth-library';
@@ -77,8 +78,19 @@ export async function login(event) {
 	if (!ok) {
 		return { status: 401, body: { message: 'Invalid credentials' } };
 	}
+	
+	// Check if profile is complete
+	let isProfileComplete = false;
+	if (user.role === 'candidate') {
+		const profile = await CandidateProfile.findOne({ where: { userId: user.id } });
+		isProfileComplete = profile?.profileCompletion === true;
+	} else if (user.role === 'practice') {
+		const profile = await PracticeProfile.findOne({ where: { userId: user.id } });
+		isProfileComplete = profile?.profileCompletion === true;
+	}
+	
 	const token = signUserToken(user);
-	return { status: 200, body: { token, user: { id: user.id, email: user.email, role: user.role } } };
+	return { status: 200, body: { token, user: { id: user.id, email: user.email, role: user.role }, isProfileComplete } };
 }
 
 // Google OAuth signup/login
@@ -110,8 +122,19 @@ export async function googleAuth(event) {
 		if (!user.isEmailVerified) user.isEmailVerified = true;
 		await user.save();
 	}
+	
+	// Check if profile is complete
+	let isProfileComplete = false;
+	if (user.role === 'candidate') {
+		const profile = await CandidateProfile.findOne({ where: { userId: user.id } });
+		isProfileComplete = profile?.profileCompletion === true;
+	} else if (user.role === 'practice') {
+		const profile = await PracticeProfile.findOne({ where: { userId: user.id } });
+		isProfileComplete = profile?.profileCompletion === true;
+	}
+	
 	const token = signUserToken(user);
-	return { status: 200, body: { token, user: { id: user.id, email: user.email, role: user.role } } };
+	return { status: 200, body: { token, user: { id: user.id, email: user.email, role: user.role }, isProfileComplete } };
 }
 
 // Apple OAuth signup/login
@@ -144,8 +167,19 @@ export async function appleAuth(event) {
 		if (!user.isEmailVerified) user.isEmailVerified = true;
 		await user.save();
 	}
+	
+	// Check if profile is complete
+	let isProfileComplete = false;
+	if (user.role === 'candidate') {
+		const profile = await CandidateProfile.findOne({ where: { userId: user.id } });
+		isProfileComplete = profile?.profileCompletion === true;
+	} else if (user.role === 'practice') {
+		const profile = await PracticeProfile.findOne({ where: { userId: user.id } });
+		isProfileComplete = profile?.profileCompletion === true;
+	}
+	
 	const token = signUserToken(user);
-	return { status: 200, body: { token, user: { id: user.id, email: user.email, role: user.role } } };
+	return { status: 200, body: { token, user: { id: user.id, email: user.email, role: user.role }, isProfileComplete } };
 }
 
 export async function forgetPasswordRequest(event) {
