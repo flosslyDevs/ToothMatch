@@ -100,7 +100,10 @@ export async function likeTarget(req, res) {
 }
 
 export async function getMatches(req, res) {
-    const userId = req.user.sub;
+    const userId = req.user?.sub;
+    if (!userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+    }
     const { page = 1, limit = 10 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     try {
@@ -112,12 +115,17 @@ export async function getMatches(req, res) {
             let target = null;
             if (m.targetType === 'locum') {
                 target = await LocumShift.findByPk(m.targetId);
-            } else {
+            } else if (m.targetType === 'permanent') {
                 target = await PermanentJob.findByPk(m.targetId);
             }
             const candidate = await CandidateProfile.findOne({ where: { userId: m.candidateUserId } });
             const practice = await PracticeProfile.findOne({ where: { userId: m.practiceUserId } });
-            return { ...m.toJSON(), target, candidate, practice };
+            return { 
+                ...m.toJSON(), 
+                target: target ? target.toJSON() : null, 
+                candidate: candidate ? candidate.toJSON() : null, 
+                practice: practice ? practice.toJSON() : null 
+            };
         }));
 
         return res.status(200).json({
@@ -129,7 +137,8 @@ export async function getMatches(req, res) {
             }
         });
     } catch (error) {
-        return res.status(500).json({ message: error.message });
+        console.error('Error in getMatches:', error);
+        return res.status(500).json({ message: error.message || 'Internal server error' });
     }
 }
 
