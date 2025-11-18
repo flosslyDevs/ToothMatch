@@ -20,6 +20,16 @@ const Interview = sequelize?.define('Interview', {
 		defaultValue: 'scheduled' 
 	},
 	notes: { type: DataTypes.TEXT, allowNull: true }, // Optional notes
+	// Reschedule request fields
+	rescheduleRequested: { type: DataTypes.BOOLEAN, defaultValue: false },
+	rescheduleRequestDate: { type: DataTypes.DATE, allowNull: true },
+	rescheduleRequestReason: { type: DataTypes.TEXT, allowNull: true },
+	rescheduleRequestedDate: { type: DataTypes.STRING, allowNull: true }, // New requested date
+	rescheduleRequestedTime: { type: DataTypes.STRING, allowNull: true }, // New requested time
+	// Decline fields
+	declined: { type: DataTypes.BOOLEAN, defaultValue: false },
+	declinedAt: { type: DataTypes.DATE, allowNull: true },
+	declineReason: { type: DataTypes.TEXT, allowNull: true },
 	createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
 	updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
 }, { 

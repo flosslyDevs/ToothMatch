@@ -183,3 +183,275 @@ export async function getPracticeInterviews(req, res) {
 	}
 }
 
+// Candidate: Request reschedule for an interview
+export async function requestReschedule(req, res) {
+	const candidateUserId = req.user?.sub;
+	const { id } = req.params;
+	const { requestedDate, requestedTime, reason } = req.body;
+
+	try {
+		if (!candidateUserId) {
+			return res.status(401).json({ message: 'User not authenticated' });
+		}
+
+		// Verify user is a candidate
+		const candidate = await User.findByPk(candidateUserId);
+		if (!candidate || candidate.role !== 'candidate') {
+			return res.status(403).json({ message: 'Only candidates can request reschedule' });
+		}
+
+		// Find the interview
+		const interview = await Interview.findByPk(id);
+		if (!interview) {
+			return res.status(404).json({ message: 'Interview not found' });
+		}
+
+		// Verify the interview belongs to this candidate
+		if (interview.candidateUserId !== candidateUserId) {
+			return res.status(403).json({ message: 'You can only request reschedule for your own interviews' });
+		}
+
+		// Check if interview is already declined
+		if (interview.declined) {
+			return res.status(400).json({ message: 'Cannot request reschedule for a declined interview' });
+		}
+
+		// Validate required fields
+		if (!requestedDate || !requestedTime) {
+			return res.status(400).json({ 
+				message: 'Missing required fields: requestedDate and requestedTime are required' 
+			});
+		}
+
+		// Validate time format (24-hour format: HH:MM)
+		const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+		if (!timeRegex.test(requestedTime)) {
+			return res.status(400).json({ 
+				message: 'Invalid time format. Use 24-hour format (HH:MM), e.g., "14:30"' 
+			});
+		}
+
+		// Update interview with reschedule request
+		await interview.update({
+			rescheduleRequested: true,
+			rescheduleRequestDate: new Date(),
+			rescheduleRequestReason: reason || null,
+			rescheduleRequestedDate: requestedDate,
+			rescheduleRequestedTime: requestedTime
+		});
+
+		// Fetch updated interview with related data
+		const updatedInterview = await Interview.findByPk(interview.id, {
+			include: [
+				{
+					model: User,
+					as: 'Practice',
+					attributes: ['id', 'email'],
+					include: [{
+						model: PracticeProfile,
+						attributes: ['id', 'clinicType', 'phoneNumber']
+					}]
+				},
+				{
+					model: User,
+					as: 'Candidate',
+					attributes: ['id', 'email'],
+					include: [{
+						model: CandidateProfile,
+						attributes: ['id', 'fullName', 'jobTitle']
+					}]
+				}
+			]
+		});
+
+		return res.status(200).json({ 
+			message: 'Reschedule request submitted successfully',
+			interview: updatedInterview 
+		});
+	} catch (error) {
+		console.error('Error requesting reschedule:', error);
+		return res.status(500).json({ 
+			message: 'Error requesting reschedule',
+			error: error.message 
+		});
+	}
+}
+
+// Practice: Approve reschedule and update interview date/time
+export async function approveReschedule(req, res) {
+	const practiceUserId = req.user?.sub;
+	const { id } = req.params;
+	const { date, time } = req.body;
+
+	try {
+		if (!practiceUserId) {
+			return res.status(401).json({ message: 'User not authenticated' });
+		}
+
+		// Verify user is a practice
+		const practice = await User.findByPk(practiceUserId);
+		if (!practice || practice.role !== 'practice') {
+			return res.status(403).json({ message: 'Only practices can approve reschedule requests' });
+		}
+
+		// Find the interview
+		const interview = await Interview.findByPk(id);
+		if (!interview) {
+			return res.status(404).json({ message: 'Interview not found' });
+		}
+
+		// Verify the interview belongs to this practice
+		if (interview.practiceUserId !== practiceUserId) {
+			return res.status(403).json({ message: 'You can only approve reschedule for your own interviews' });
+		}
+
+		// Check if there's a pending reschedule request
+		if (!interview.rescheduleRequested) {
+			return res.status(400).json({ message: 'No pending reschedule request for this interview' });
+		}
+
+		// If date and time are provided, use them; otherwise use the requested date/time
+		const newDate = date || interview.rescheduleRequestedDate;
+		const newTime = time || interview.rescheduleRequestedTime;
+
+		if (!newDate || !newTime) {
+			return res.status(400).json({ 
+				message: 'Missing required fields: date and time are required' 
+			});
+		}
+
+		// Validate time format (24-hour format: HH:MM)
+		const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+		if (!timeRegex.test(newTime)) {
+			return res.status(400).json({ 
+				message: 'Invalid time format. Use 24-hour format (HH:MM), e.g., "14:30"' 
+			});
+		}
+
+		// Update interview with new date/time and clear reschedule request
+		await interview.update({
+			date: newDate,
+			time: newTime,
+			rescheduleRequested: false,
+			rescheduleRequestDate: null,
+			rescheduleRequestReason: null,
+			rescheduleRequestedDate: null,
+			rescheduleRequestedTime: null,
+			status: 'scheduled' // Reset to scheduled when rescheduled
+		});
+
+		// Fetch updated interview with related data
+		const updatedInterview = await Interview.findByPk(interview.id, {
+			include: [
+				{
+					model: User,
+					as: 'Practice',
+					attributes: ['id', 'email'],
+					include: [{
+						model: PracticeProfile,
+						attributes: ['id', 'clinicType', 'phoneNumber']
+					}]
+				},
+				{
+					model: User,
+					as: 'Candidate',
+					attributes: ['id', 'email'],
+					include: [{
+						model: CandidateProfile,
+						attributes: ['id', 'fullName', 'jobTitle']
+					}]
+				}
+			]
+		});
+
+		return res.status(200).json({ 
+			message: 'Interview rescheduled successfully',
+			interview: updatedInterview 
+		});
+	} catch (error) {
+		console.error('Error approving reschedule:', error);
+		return res.status(500).json({ 
+			message: 'Error approving reschedule',
+			error: error.message 
+		});
+	}
+}
+
+// Candidate: Decline an interview
+export async function declineInterview(req, res) {
+	const candidateUserId = req.user?.sub;
+	const { id } = req.params;
+	const { reason } = req.body;
+
+	try {
+		if (!candidateUserId) {
+			return res.status(401).json({ message: 'User not authenticated' });
+		}
+
+		// Verify user is a candidate
+		const candidate = await User.findByPk(candidateUserId);
+		if (!candidate || candidate.role !== 'candidate') {
+			return res.status(403).json({ message: 'Only candidates can decline interviews' });
+		}
+
+		// Find the interview
+		const interview = await Interview.findByPk(id);
+		if (!interview) {
+			return res.status(404).json({ message: 'Interview not found' });
+		}
+
+		// Verify the interview belongs to this candidate
+		if (interview.candidateUserId !== candidateUserId) {
+			return res.status(403).json({ message: 'You can only decline your own interviews' });
+		}
+
+		// Check if already declined
+		if (interview.declined) {
+			return res.status(400).json({ message: 'Interview is already declined' });
+		}
+
+		// Update interview to declined
+		await interview.update({
+			declined: true,
+			declinedAt: new Date(),
+			declineReason: reason || null,
+			status: 'cancelled' // Also update status to cancelled
+		});
+
+		// Fetch updated interview with related data
+		const updatedInterview = await Interview.findByPk(interview.id, {
+			include: [
+				{
+					model: User,
+					as: 'Practice',
+					attributes: ['id', 'email'],
+					include: [{
+						model: PracticeProfile,
+						attributes: ['id', 'clinicType', 'phoneNumber']
+					}]
+				},
+				{
+					model: User,
+					as: 'Candidate',
+					attributes: ['id', 'email'],
+					include: [{
+						model: CandidateProfile,
+						attributes: ['id', 'fullName', 'jobTitle']
+					}]
+				}
+			]
+		});
+
+		return res.status(200).json({ 
+			message: 'Interview declined successfully',
+			interview: updatedInterview 
+		});
+	} catch (error) {
+		console.error('Error declining interview:', error);
+		return res.status(500).json({ 
+			message: 'Error declining interview',
+			error: error.message 
+		});
+	}
+}
+
