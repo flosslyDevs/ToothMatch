@@ -54,10 +54,144 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
     if (targetType === 'candidate') {
         const candidateUserId = targetId;
         const practiceUserId = actorUserId;
-        const reciprocal = await MatchLike.findOne({ where: { actorUserId: candidateUserId, targetType: { [Op.in]: ['locum','permanent'] }, decision: 'like' } });
-        if (!reciprocal) return null;
-        // We don't know exact job from reciprocal; skip score and create generic match? We'll skip until job like pairs exist
-        return null;
+        
+        try {
+            // Find all jobs the candidate has liked
+            const candidateLikes = await MatchLike.findAll({ 
+                where: { 
+                    actorUserId: candidateUserId, 
+                    targetType: { [Op.in]: ['locum', 'permanent'] }, 
+                    decision: 'like' 
+                } 
+            });
+            
+            console.log(`[ensureMatchIfMutual] Practice ${practiceUserId} liking candidate ${candidateUserId}`);
+            console.log(`[ensureMatchIfMutual] Candidate has liked ${candidateLikes.length} jobs`);
+            
+            if (candidateLikes.length === 0) {
+                console.log(`[ensureMatchIfMutual] No jobs liked by candidate, returning null`);
+                return null;
+            }
+            
+            // Group likes by type and extract target IDs
+            const locumTargetIds = candidateLikes.filter(l => l.targetType === 'locum').map(l => l.targetId);
+            const permanentTargetIds = candidateLikes.filter(l => l.targetType === 'permanent').map(l => l.targetId);
+            
+            console.log(`[ensureMatchIfMutual] Locum target IDs:`, locumTargetIds);
+            console.log(`[ensureMatchIfMutual] Permanent target IDs:`, permanentTargetIds);
+            
+            // Find matching jobs (jobs from this practice that candidate liked) with PracticeProfile included
+            const matchingJobs = [];
+            
+            if (locumTargetIds.length > 0) {
+                // First, let's check what jobs exist for these IDs (without userId filter)
+                const allLikedLocumJobs = await LocumShift.findAll({ 
+                    where: { 
+                        id: { [Op.in]: locumTargetIds }
+                    }
+                });
+                console.log(`[ensureMatchIfMutual] All liked locum jobs found:`, allLikedLocumJobs.map(j => ({ id: j.id, userId: j.userId })));
+                
+                // Now filter by practice userId
+                const locumJobs = await LocumShift.findAll({ 
+                    where: { 
+                        id: { [Op.in]: locumTargetIds },
+                        userId: practiceUserId 
+                    },
+                    include: [{ model: PracticeProfile, include: [{ model: PracticeLocation, required: false }] }]
+                });
+                console.log(`[ensureMatchIfMutual] Found ${locumJobs.length} locum jobs from this practice (userId: ${practiceUserId})`);
+                
+                // Also check what jobs this practice actually has
+                const practiceLocumJobs = await LocumShift.findAll({ 
+                    where: { userId: practiceUserId },
+                    attributes: ['id', 'userId']
+                });
+                console.log(`[ensureMatchIfMutual] All locum jobs for this practice:`, practiceLocumJobs.map(j => ({ id: j.id, userId: j.userId })));
+                
+                for (const job of locumJobs) {
+                    matchingJobs.push({ job, targetType: 'locum', targetId: job.id });
+                }
+            }
+            
+            if (permanentTargetIds.length > 0) {
+                // First, let's check what jobs exist for these IDs (without userId filter)
+                const allLikedPermanentJobs = await PermanentJob.findAll({ 
+                    where: { 
+                        id: { [Op.in]: permanentTargetIds }
+                    }
+                });
+                console.log(`[ensureMatchIfMutual] All liked permanent jobs found:`, allLikedPermanentJobs.map(j => ({ id: j.id, userId: j.userId })));
+                
+                const permanentJobs = await PermanentJob.findAll({ 
+                    where: { 
+                        id: { [Op.in]: permanentTargetIds },
+                        userId: practiceUserId 
+                    },
+                    include: [{ model: PracticeProfile, include: [{ model: PracticeLocation, required: false }] }]
+                });
+                console.log(`[ensureMatchIfMutual] Found ${permanentJobs.length} permanent jobs from this practice (userId: ${practiceUserId})`);
+                
+                // Also check what jobs this practice actually has
+                const practicePermanentJobs = await PermanentJob.findAll({ 
+                    where: { userId: practiceUserId },
+                    attributes: ['id', 'userId']
+                });
+                console.log(`[ensureMatchIfMutual] All permanent jobs for this practice:`, practicePermanentJobs.map(j => ({ id: j.id, userId: j.userId })));
+                
+                for (const job of permanentJobs) {
+                    matchingJobs.push({ job, targetType: 'permanent', targetId: job.id });
+                }
+            }
+            
+            console.log(`[ensureMatchIfMutual] Total matching jobs: ${matchingJobs.length}`);
+            
+            if (matchingJobs.length === 0) {
+                console.log(`[ensureMatchIfMutual] No matching jobs found, returning null`);
+                return null;
+            }
+            
+            // Create matches for all matching jobs (or return the first one if multiple)
+            let firstMatch = null;
+            const candidate = await CandidateProfile.findOne({ 
+                where: { userId: candidateUserId }, 
+                include: [{ model: User, include: [{ model: JobPreference, required: false }] }]
+            });
+            
+            if (!candidate) {
+                console.log(`[ensureMatchIfMutual] Candidate profile not found, returning null`);
+                return null;
+            }
+            
+            for (const { job, targetType: jobType, targetId: jobId } of matchingJobs) {
+                // Check if match already exists
+                const existing = await Match.findOne({ 
+                    where: { candidateUserId, practiceUserId, targetType: jobType, targetId: jobId } 
+                });
+                if (existing) {
+                    console.log(`[ensureMatchIfMutual] Match already exists for job ${jobId}`);
+                    if (!firstMatch) firstMatch = existing;
+                    continue;
+                }
+                
+                const score = scoreCandidateToJob(candidate, job, jobType);
+                console.log(`[ensureMatchIfMutual] Creating match for job ${jobId} with score ${score}`);
+                const match = await Match.create({ 
+                    candidateUserId, 
+                    practiceUserId, 
+                    targetType: jobType, 
+                    targetId: jobId, 
+                    score 
+                });
+                if (!firstMatch) firstMatch = match;
+            }
+            
+            console.log(`[ensureMatchIfMutual] Returning match:`, firstMatch?.id);
+            return firstMatch;
+        } catch (error) {
+            console.error('[ensureMatchIfMutual] Error:', error);
+            throw error;
+        }
     } else {
         // target is job; get job to find practice user
         const model = targetType === 'locum' ? LocumShift : PermanentJob;

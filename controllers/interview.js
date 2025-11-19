@@ -183,6 +183,74 @@ export async function getPracticeInterviews(req, res) {
 	}
 }
 
+// Unified endpoint: Get interviews based on user role (auto-detects candidate or practice)
+export async function getMyInterviews(req, res) {
+	const userId = req.user?.sub;
+	
+	if (!userId) {
+		return res.status(401).json({ message: 'User not authenticated' });
+	}
+
+	try {
+		const user = await User.findByPk(userId);
+		if (!user) {
+			return res.status(404).json({ message: 'User not found' });
+		}
+
+		let interviews;
+		
+		if (user.role === 'candidate') {
+			// Fetch all interviews for this candidate
+			interviews = await Interview.findAll({
+				where: { candidateUserId: userId },
+				include: [
+					{
+						model: User,
+						as: 'Practice',
+						attributes: ['id', 'email'],
+						include: [{
+							model: PracticeProfile,
+							attributes: ['id', 'clinicType', 'phoneNumber']
+						}]
+					}
+				],
+				order: [['date', 'ASC'], ['time', 'ASC']]
+			});
+		} else if (user.role === 'practice') {
+			// Fetch all interviews scheduled by this practice
+			interviews = await Interview.findAll({
+				where: { practiceUserId: userId },
+				include: [
+					{
+						model: User,
+						as: 'Candidate',
+						attributes: ['id', 'email'],
+						include: [{
+							model: CandidateProfile,
+							attributes: ['id', 'fullName', 'jobTitle']
+						}]
+					}
+				],
+				order: [['date', 'ASC'], ['time', 'ASC']]
+			});
+		} else {
+			return res.status(403).json({ message: 'Invalid user role' });
+		}
+
+		return res.status(200).json({ 
+			interviews,
+			count: interviews.length,
+			role: user.role
+		});
+	} catch (error) {
+		console.error('Error fetching interviews:', error);
+		return res.status(500).json({ 
+			message: 'Error fetching interviews',
+			error: error.message 
+		});
+	}
+}
+
 // Candidate: Request reschedule for an interview
 export async function requestReschedule(req, res) {
 	const candidateUserId = req.user?.sub;

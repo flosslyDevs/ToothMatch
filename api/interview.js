@@ -4,6 +4,7 @@ import {
 	scheduleInterview, 
 	getCandidateInterviews, 
 	getPracticeInterviews,
+	getMyInterviews,
 	requestReschedule,
 	approveReschedule,
 	declineInterview
@@ -17,10 +18,13 @@ router.use(authMiddleware);
 // Practice: Schedule an interview
 router.post('/', scheduleInterview);
 
-// Candidate: Get their interviews
+// Unified: Get interviews (auto-detects role - candidate or practice)
+router.get('/', getMyInterviews);
+
+// Candidate: Get their interviews (kept for backward compatibility)
 router.get('/candidate', getCandidateInterviews);
 
-// Practice: Get their scheduled interviews
+// Practice: Get their scheduled interviews (kept for backward compatibility)
 router.get('/practice', getPracticeInterviews);
 
 // Candidate: Request reschedule for an interview
