@@ -95,4 +95,7 @@ router.post('/blocklist/:blockedUserId', blockCandidateProfile);
 // Unblock candidate profile
 router.delete('/blocklist/:blockedUserId', unblockCandidateProfile);
 
+// Rate candidate profile (by practice)
+router.post('/rate/:candidateId', rateCandidateProfile);
+
 export default router;

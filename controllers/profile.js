@@ -15,6 +15,7 @@ import {
 	IdentityDocument, 
 	JobPreference, 
 	AvailabilitySlot,
+	Rating,
 	Blocklist,
 	Report
 } from '../models/index.js';
@@ -424,6 +425,35 @@ export async function unblockCandidateProfile(req, res) {
 		return res.status(500).json({ message: 'Not blocked' });
 	}
 }
+
+// Rate candidate profile (by practice)
+export async function rateCandidateProfile(req, res) {
+	const { candidateId } = req.params;
+	const { rating, comment } = req.body;
+	if (rating < 1 || rating > 5) {
+		return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+	}
+	if (comment && comment.length > 500) {
+		return res.status(400).json({ message: 'Comment must be less than 500 characters' });	
+	}
+	const userId = req.user.sub;
+	try {
+		// Find the candidate profile by ID or userId
+		let profile = await CandidateProfile.findByPk(candidateId);
+		if (!profile) {
+			// Try finding by userId
+			profile = await CandidateProfile.findOne({ where: { userId: candidateId } });
+		}
+		if (!profile) {
+			return res.status(404).json({ message: 'Candidate profile not found' });
+		}
+		const candidateRating = await Rating.create({ profileId: profile.id, userId, type: 'candidate', rating, comment });
+		return res.status(200).json({ message: 'Candidate profile rated successfully', candidateRating });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
 // Complete Profile Create (All Steps in One)
 export async function createCompleteProfile(req, res) {
     const userId = req.user.sub;
