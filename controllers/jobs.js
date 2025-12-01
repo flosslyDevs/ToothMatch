@@ -687,3 +687,69 @@ export async function filterCandidatesForPractices(req, res) {
         });
     }
 }
+
+// Activate a job
+export async function activateJob(req, res) {
+	const { jobId } = req.params;
+	const userId = req.user.sub;
+	try {
+		const job = await PermanentJob.findByPk(jobId);
+		if (!job) {
+			const locum = await LocumShift.findByPk(jobId);
+			if (!locum) {
+				return res.status(404).json({ message: 'Job not found' });
+			}
+			if (locum.userId !== userId) {
+				return res.status(403).json({ message: 'You are not authorized to activate this job' });
+			}
+			if (locum.status === 'active') {
+				return res.status(400).json({ message: 'Job is already active' });
+			}
+			await locum.update({ status: 'active' });
+			return res.status(200).json({ message: 'Job activated successfully', type: 'locum' });
+		}
+		if (job.userId !== userId) {
+			return res.status(403).json({ message: 'You are not authorized to activate this job' });
+		}
+		if (job.status === 'active') {
+			return res.status(400).json({ message: 'Job is already active' });
+		}
+		await job.update({ status: 'active' });
+		return res.status(200).json({ message: 'Job activated successfully', type: 'permanent' });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Pause a job
+export async function pauseJob(req, res) {
+	const { jobId } = req.params;
+	const userId = req.user.sub;
+	try {
+		const job = await PermanentJob.findByPk(jobId);
+		if (!job) {
+			const locum = await LocumShift.findByPk(jobId);
+			if (!locum) {
+				return res.status(404).json({ message: 'Job not found' });
+			}
+			if (locum.userId !== userId) {
+				return res.status(403).json({ message: 'You are not authorized to pause this job' });
+			}
+			if (locum.status === 'paused') {
+				return res.status(400).json({ message: 'Job is already paused' });
+			}
+			await locum.update({ status: 'paused' });
+			return res.status(200).json({ message: 'Job paused successfully', type: 'locum' });
+		}
+		if (job.userId !== userId) {
+			return res.status(403).json({ message: 'You are not authorized to pause this job' });
+		}		
+		if (job.status === 'paused') {
+			return res.status(400).json({ message: 'Job is already paused' });
+		}
+		await job.update({ status: 'paused' });
+		return res.status(200).json({ message: 'Job paused successfully', type: 'permanent' });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
