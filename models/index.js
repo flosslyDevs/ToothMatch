@@ -22,6 +22,9 @@ import PermanentJob from './practice/permanentJob.js';
 import Interview from './practice/interview.js';
 import MatchLike from './match/matchLike.js';
 import Match from './match/match.js';
+import Rating from './shared/rating.js';
+import Blocklist from './profile/blocklist.js';
+import Report from './profile/report.js';
 
 // Associations
 CandidateProfile.belongsTo(User, { foreignKey: 'userId' });
@@ -139,6 +142,9 @@ export {
     Interview,
     MatchLike,
     Match,
+	Rating,
+	Blocklist,
+	Report,
 };
 
 

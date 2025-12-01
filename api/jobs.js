@@ -1,5 +1,6 @@
 import express from 'express';
-import { getPractitionerJobs, getAllActiveJobs, filterJobsForCandidates, filterCandidatesForPractices } from '../controllers/jobs.js';
+import { authMiddleware } from '../utils/auth.js';
+import { getPractitionerJobs, getAllActiveJobs, filterJobsForCandidates, filterCandidatesForPractices, activateJob, pauseJob } from '../controllers/jobs.js';
 
 const router = express.Router();
 
@@ -14,5 +15,14 @@ router.get('/public/filter', filterJobsForCandidates);
 
 // Public route - Filter candidates for practices
 router.get('/public/candidates/filter', filterCandidatesForPractices);
+
+// Authenticated job routes below
+router.use(authMiddleware);
+
+// Activate a job
+router.post('/activate/:jobId', activateJob);
+
+// Pause a job
+router.post('/pause/:jobId', pauseJob);
 
 export default router;
