@@ -14,7 +14,9 @@ import {
 	Media, 
 	IdentityDocument, 
 	JobPreference, 
-	AvailabilitySlot 
+	AvailabilitySlot,
+	Blocklist,
+	Report
 } from '../models/index.js';
 
 // Step 1-2: Basic Profile
@@ -372,6 +374,56 @@ export async function getUnifiedProfile(req, res) {
     }
 }
 
+// Profile deletion handler
+export async function deleteProfile(req, res) {
+	const userId = req.user.sub;
+	try {
+		const result = await CandidateProfile.destroy({ where: { userId } });
+		if (result === 0) {
+			return res.status(404).json({ message: 'Profile not found' });
+		}
+		return res.status(200).json({ message: 'Profile deleted successfully' });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Report candidate profile
+export async function reportCandidateProfile(req, res) {
+	const { reportedUserId } = req.params;
+	const { reason } = req.body;
+	const reportedByUserId = req.user.sub;
+	try {
+		const result = await Report.create({ reportedUserId, reportedByUserId, reason });
+		return res.status(200).json({ message: 'Profile reported successfully', reportId: result.id });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+    }
+}
+
+// Block candidate profile
+export async function blockCandidateProfile(req, res) {
+	const { blockedUserId } = req.params;
+	const blockedByUserId = req.user.sub;
+	try {
+		await Blocklist.create({ blockedUserId, blockedByUserId });
+		return res.status(200).json({ message: 'Candidate profile blocked successfully' });
+	} catch (error) {
+		return res.status(500).json({ message: 'Already blocked' });
+	}
+}
+
+// Unblock candidate profile
+export async function unblockCandidateProfile(req, res) {
+	const { blockedUserId } = req.params;
+	const blockedByUserId = req.user.sub;
+	try {
+		await Blocklist.destroy({ where: { blockedUserId, blockedByUserId } });
+		return res.status(200).json({ message: 'Candidate profile unblocked successfully' });
+	} catch (error) {
+		return res.status(500).json({ message: 'Not blocked' });
+	}
+}
 // Complete Profile Create (All Steps in One)
 export async function createCompleteProfile(req, res) {
     const userId = req.user.sub;
