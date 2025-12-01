@@ -148,10 +148,11 @@ export async function getPracticeProfile(req, res) {
 		const profile = await PracticeProfile.findOne({ where: { userId } });
 		const media = await PracticeMedia.findAll({ where: { userId } });
 		const locations = await PracticeLocation.findAll({ where: { userId } });
+		const ratings = await Rating.findAll({ where: { profileId: profile.id, type: 'practice' } });
 		// const compliance = await PracticeCompliance.findOne({ where: { userId } });
 		// const payment = await PracticePayment.findOne({ where: { userId } });
 		// const culture = await PracticeCulture.findOne({ where: { userId } });
-		return res.status(200).json({ profile, media, locations });
+		return res.status(200).json({ profile, media, locations, ratings });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}

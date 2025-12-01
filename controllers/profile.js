@@ -768,6 +768,7 @@ export async function getCandidateById(req, res) {
 		const documents = await IdentityDocument.findAll({ where: { userId } });
 		const jobPreferences = await JobPreference.findOne({ where: { userId } });
 		const availabilitySlots = await AvailabilitySlot.findAll({ where: { userId } });
+		const ratings = await Rating.findAll({ where: { profileId: profile.id, type: 'candidate' } });
 
 		// Get user skills and specializations with names
 		const userSkills = await UserSkill.findAll({ 
@@ -802,7 +803,8 @@ export async function getCandidateById(req, res) {
 			media,
 			documents,
 			jobPreferences,
-			availabilitySlots
+			availabilitySlots,
+			ratings
 		});
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
