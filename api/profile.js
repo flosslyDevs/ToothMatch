@@ -23,7 +23,12 @@ import {
 	getCompleteProfile,
 	getUnifiedProfile,
 	createCompleteProfile,
-	getCandidateById
+	getCandidateById,
+	reportCandidateProfile,
+	deleteProfile,
+	blockCandidateProfile,
+	unblockCandidateProfile,
+	rateCandidateProfile
 } from '../controllers/profile.js';
 
 const router = express.Router();
@@ -77,5 +82,20 @@ router.get('/complete', getCompleteProfile);
 
 // Unified (candidate or practice) based on kind or auto-detect
 router.get('/me', getUnifiedProfile);
+
+// Report candidate profile
+router.post('/report/:reportedUserId', reportCandidateProfile);
+
+// Delete own profile
+router.delete('/', deleteProfile);
+
+// Block candidate profile
+router.post('/blocklist/:blockedUserId', blockCandidateProfile);
+
+// Unblock candidate profile
+router.delete('/blocklist/:blockedUserId', unblockCandidateProfile);
+
+// Rate candidate profile (by practice)
+router.post('/rate/:candidateId', rateCandidateProfile);
 
 export default router;

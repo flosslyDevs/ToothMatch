@@ -14,7 +14,10 @@ import {
 	Media, 
 	IdentityDocument, 
 	JobPreference, 
-	AvailabilitySlot 
+	AvailabilitySlot,
+	Rating,
+	Blocklist,
+	Report
 } from '../models/index.js';
 
 // Step 1-2: Basic Profile
@@ -372,6 +375,85 @@ export async function getUnifiedProfile(req, res) {
     }
 }
 
+// Profile deletion handler
+export async function deleteProfile(req, res) {
+	const userId = req.user.sub;
+	try {
+		const result = await CandidateProfile.destroy({ where: { userId } });
+		if (result === 0) {
+			return res.status(404).json({ message: 'Profile not found' });
+		}
+		return res.status(200).json({ message: 'Profile deleted successfully' });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
+// Report candidate profile
+export async function reportCandidateProfile(req, res) {
+	const { reportedUserId } = req.params;
+	const { reason } = req.body;
+	const reportedByUserId = req.user.sub;
+	try {
+		const result = await Report.create({ reportedUserId, reportedByUserId, reason });
+		return res.status(200).json({ message: 'Profile reported successfully', reportId: result.id });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+    }
+}
+
+// Block candidate profile
+export async function blockCandidateProfile(req, res) {
+	const { blockedUserId } = req.params;
+	const blockedByUserId = req.user.sub;
+	try {
+		await Blocklist.create({ blockedUserId, blockedByUserId });
+		return res.status(200).json({ message: 'Candidate profile blocked successfully' });
+	} catch (error) {
+		return res.status(500).json({ message: 'Already blocked' });
+	}
+}
+
+// Unblock candidate profile
+export async function unblockCandidateProfile(req, res) {
+	const { blockedUserId } = req.params;
+	const blockedByUserId = req.user.sub;
+	try {
+		await Blocklist.destroy({ where: { blockedUserId, blockedByUserId } });
+		return res.status(200).json({ message: 'Candidate profile unblocked successfully' });
+	} catch (error) {
+		return res.status(500).json({ message: 'Not blocked' });
+	}
+}
+
+// Rate candidate profile (by practice)
+export async function rateCandidateProfile(req, res) {
+	const { candidateId } = req.params;
+	const { rating, comment } = req.body;
+	if (rating < 1 || rating > 5) {
+		return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+	}
+	if (comment && comment.length > 500) {
+		return res.status(400).json({ message: 'Comment must be less than 500 characters' });	
+	}
+	const userId = req.user.sub;
+	try {
+		// Find the candidate profile by ID or userId
+		let profile = await CandidateProfile.findByPk(candidateId);
+		if (!profile) {
+			// Try finding by userId
+			profile = await CandidateProfile.findOne({ where: { userId: candidateId } });
+		}
+		if (!profile) {
+			return res.status(404).json({ message: 'Candidate profile not found' });
+		}
+		const candidateRating = await Rating.create({ profileId: profile.id, userId, type: 'candidate', rating, comment });
+		return res.status(200).json({ message: 'Candidate profile rated successfully', candidateRating });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
+
 // Complete Profile Create (All Steps in One)
 export async function createCompleteProfile(req, res) {
     const userId = req.user.sub;
@@ -686,6 +768,7 @@ export async function getCandidateById(req, res) {
 		const documents = await IdentityDocument.findAll({ where: { userId } });
 		const jobPreferences = await JobPreference.findOne({ where: { userId } });
 		const availabilitySlots = await AvailabilitySlot.findAll({ where: { userId } });
+		const ratings = await Rating.findAll({ where: { profileId: profile.id, type: 'candidate' } });
 
 		// Get user skills and specializations with names
 		const userSkills = await UserSkill.findAll({ 
@@ -720,7 +803,8 @@ export async function getCandidateById(req, res) {
 			media,
 			documents,
 			jobPreferences,
-			availabilitySlots
+			availabilitySlots,
+			ratings
 		});
 	} catch (error) {
 		return res.status(500).json({ message: error.message });

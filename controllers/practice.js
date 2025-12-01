@@ -6,6 +6,7 @@ import {
 	PracticeCompliance,
 	PracticePayment,
 	PracticeCulture,
+	Rating,
 } from '../models/index.js';
 
 // Create a new practice profile
@@ -147,10 +148,11 @@ export async function getPracticeProfile(req, res) {
 		const profile = await PracticeProfile.findOne({ where: { userId } });
 		const media = await PracticeMedia.findAll({ where: { userId } });
 		const locations = await PracticeLocation.findAll({ where: { userId } });
+		const ratings = await Rating.findAll({ where: { profileId: profile.id, type: 'practice' } });
 		// const compliance = await PracticeCompliance.findOne({ where: { userId } });
 		// const payment = await PracticePayment.findOne({ where: { userId } });
 		// const culture = await PracticeCulture.findOne({ where: { userId } });
-		return res.status(200).json({ profile, media, locations });
+		return res.status(200).json({ profile, media, locations, ratings });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
 	}
@@ -242,5 +244,20 @@ export async function getSpecificPractice(req, res) {
 	}
 }
 
-
-
+export async function ratePractice(req, res) {
+	const { practiceId } = req.params;
+	const { rating, comment } = req.body;
+	if (rating < 1 || rating > 5) {
+		return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+	}
+	if (comment && comment.length > 500) {
+		return res.status(400).json({ message: 'Comment must be less than 500 characters' });	
+	}
+	const userId = req.user.sub;
+	try {
+		const practiceRating = await Rating.create({ profileId: practiceId, userId, type: 'practice', rating, comment });
+		return res.status(200).json({ message: 'Practice rated successfully', practiceRating });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+}
