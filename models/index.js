@@ -1,4 +1,5 @@
 import User from './auth/users.js';
+import Event from './events.js';
 import CandidateProfile from './profile/candidateProfile.js';
 import Education from './profile/education.js';
 import WorkExperience from './profile/workExperience.js';
@@ -119,6 +120,7 @@ User.hasMany(Interview, { foreignKey: 'candidateUserId', as: 'CandidateInterview
 
 export {
 	User,
+	Event,
 	CandidateProfile,
 	Education,
 	WorkExperience,
