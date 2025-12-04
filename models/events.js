@@ -16,6 +16,9 @@ const Event = sequelize?.define('Event', {
 	endTime: { type: DataTypes.DATE, allowNull: false },
 	speakerInfo: { type: DataTypes.TEXT, allowNull: true, field: 'speaker_info' },
 	cancellationPolicy: { type: DataTypes.TEXT, allowNull: true, field: 'cancellation_policy' },
+	location: { type: DataTypes.STRING(255), allowNull: true, field: 'location' },
+	titleOfEvent: { type: DataTypes.STRING(255), allowNull: false, field: 'title_of_event' },
+	amount: { type: DataTypes.DECIMAL(10, 2), allowNull: true, field: 'amount' },
 	status: { type: DataTypes.STRING, allowNull: false, defaultValue: 'active' }, // active, cancelled, archived
 }, {
 	tableName: 'events',
