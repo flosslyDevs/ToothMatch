@@ -9,16 +9,28 @@ import {
 	PracticeMedia,
 	PracticeLocation,
 	PracticeCompliance,
+	PracticePayment,
+	PracticeCulture,
 	UserSkill, 
 	UserSpecialization, 
 	Media, 
 	IdentityDocument, 
 	JobPreference, 
 	AvailabilitySlot,
+	LocumShift,
+	PermanentJob,
+	Interview,
+	MatchLike,
+	Match,
+	Event,
+	Booking,
 	Rating,
 	Blocklist,
-	Report
+	Report,
+	User
 } from '../models/index.js';
+import { Op } from 'sequelize';
+import { sequelize } from '../services/db.js';
 
 // Step 1-2: Basic Profile
 export async function createProfile(req, res) {
@@ -171,7 +183,8 @@ export async function uploadMedia(req, res) {
 	const userId = req.user.sub;
 	
 	try {
-		const media = await Media.create({ userId, kind, url });
+		// Replace the media with the new one
+		const media = await Media.update({ url }, { where: { userId, kind } });
 		return res.status(201).json({ media });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
@@ -378,13 +391,149 @@ export async function getUnifiedProfile(req, res) {
 // Profile deletion handler
 export async function deleteProfile(req, res) {
 	const userId = req.user.sub;
+	const transaction = await sequelize.transaction();
 	try {
-		const result = await CandidateProfile.destroy({ where: { userId } });
-		if (result === 0) {
+		const user = await User.findByPk(userId, { transaction });
+		if (!user) {
+			await transaction.rollback();
 			return res.status(404).json({ message: 'Profile not found' });
 		}
+
+		const [
+			candidateProfile,
+			practiceProfile,
+			locumShifts,
+			permanentJobs,
+			events,
+		] = await Promise.all([
+			CandidateProfile.findOne({ where: { userId }, transaction }),
+			PracticeProfile.findOne({ where: { userId }, transaction }),
+			LocumShift.findAll({ where: { userId }, attributes: ['id'], transaction }),
+			PermanentJob.findAll({ where: { userId }, attributes: ['id'], transaction }),
+			Event.findAll({ where: { userId }, attributes: ['id'], transaction }),
+		]);
+
+		const candidateProfileId = candidateProfile?.id;
+		const practiceProfileId = practiceProfile?.id;
+		const locumShiftIds = locumShifts.map(shift => shift.id);
+		const permanentJobIds = permanentJobs.map(job => job.id);
+		const eventIds = events.map(event => event.id);
+
+		const destroyPromises = [
+			Education.destroy({ where: { userId }, transaction }),
+			WorkExperience.destroy({ where: { userId }, transaction }),
+			WorkPersonality.destroy({ where: { userId }, transaction }),
+			UserSkill.destroy({ where: { userId }, transaction }),
+			UserSpecialization.destroy({ where: { userId }, transaction }),
+			Media.destroy({ where: { userId }, transaction }),
+			IdentityDocument.destroy({ where: { userId }, transaction }),
+			JobPreference.destroy({ where: { userId }, transaction }),
+			AvailabilitySlot.destroy({ where: { userId }, transaction }),
+			PracticeMedia.destroy({ where: { userId }, transaction }),
+			PracticeLocation.destroy({ where: { userId }, transaction }),
+			PracticeCompliance.destroy({ where: { userId }, transaction }),
+			PracticePayment.destroy({ where: { userId }, transaction }),
+			PracticeCulture.destroy({ where: { userId }, transaction }),
+			LocumShift.destroy({ where: { userId }, transaction }),
+			PermanentJob.destroy({ where: { userId }, transaction }),
+			Interview.destroy({
+				where: {
+					[Op.or]: [{ practiceUserId: userId }, { candidateUserId: userId }],
+				},
+				transaction,
+			}),
+			Blocklist.destroy({
+				where: {
+					[Op.or]: [{ blockedUserId: userId }, { blockedByUserId: userId }],
+				},
+				transaction,
+			}),
+			Report.destroy({
+				where: {
+					[Op.or]: [
+						{ reportedUserId: userId },
+						{ reportedByUserId: userId },
+						{ resolvedBy: userId },
+					],
+				},
+				transaction,
+			}),
+		];
+
+		const bookingConditions = [
+			{ userId },
+			eventIds.length ? { eventId: { [Op.in]: eventIds } } : null,
+		].filter(Boolean);
+		if (bookingConditions.length) {
+			destroyPromises.push(
+				Booking.destroy({
+					where: { [Op.or]: bookingConditions },
+					transaction,
+				}),
+			);
+		}
+
+		const matchLikeConditions = [
+			{ actorUserId: userId },
+			{ targetType: 'candidate', targetId: userId },
+			locumShiftIds.length ? { targetId: { [Op.in]: locumShiftIds } } : null,
+			permanentJobIds.length ? { targetId: { [Op.in]: permanentJobIds } } : null,
+		].filter(Boolean);
+		if (matchLikeConditions.length) {
+			destroyPromises.push(
+				MatchLike.destroy({
+					where: { [Op.or]: matchLikeConditions },
+					transaction,
+				}),
+			);
+		}
+
+		const matchConditions = [
+			{ candidateUserId: userId },
+			{ practiceUserId: userId },
+			locumShiftIds.length ? { targetId: { [Op.in]: locumShiftIds } } : null,
+			permanentJobIds.length ? { targetId: { [Op.in]: permanentJobIds } } : null,
+		].filter(Boolean);
+		if (matchConditions.length) {
+			destroyPromises.push(
+				Match.destroy({
+					where: { [Op.or]: matchConditions },
+					transaction,
+				}),
+			);
+		}
+
+		const ratingConditions = [
+			{ userId },
+			candidateProfileId ? { profileId: candidateProfileId } : null,
+			practiceProfileId ? { profileId: practiceProfileId } : null,
+		].filter(Boolean);
+		if (ratingConditions.length) {
+			destroyPromises.push(
+				Rating.destroy({
+					where: { [Op.or]: ratingConditions },
+					transaction,
+				}),
+			);
+		}
+
+		if (eventIds.length) {
+			destroyPromises.push(
+				Event.destroy({ where: { id: { [Op.in]: eventIds } }, transaction }),
+			);
+		}
+
+		await Promise.all(destroyPromises);
+
+		await CandidateProfile.destroy({ where: { userId }, transaction });
+		await PracticeProfile.destroy({ where: { userId }, transaction });
+
+		await User.destroy({ where: { id: userId }, transaction });
+		await transaction.commit();
+
 		return res.status(200).json({ message: 'Profile deleted successfully' });
 	} catch (error) {
+		await transaction.rollback();
 		return res.status(500).json({ message: error.message });
 	}
 }

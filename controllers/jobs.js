@@ -251,6 +251,28 @@ export async function getAllActiveJobs(req, res) {
 // Filter jobs for candidates with multiple filter options
 export async function filterJobsForCandidates(req, res) {
 	try {
+		const parseTimeToMinutes = (value) => {
+			if (!value || typeof value !== 'string') return null;
+			// Capture the first time token (e.g., "9 AM", "09:00", "09:00:00 PM") to support ranges like "9 AM - 5 PM"
+			const match = value.match(/(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(AM|PM)/i);
+			if (!match) return null;
+
+			let hour = parseInt(match[1], 10);
+			const minute = match[2] ? parseInt(match[2], 10) : 0;
+			if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+
+			const period = match[4].toLowerCase();
+			hour = (hour % 12) + (period === 'pm' ? 12 : 0);
+			return hour * 60 + minute;
+		};
+
+		const getShiftLabelFromTime = (value) => {
+			const minutes = parseTimeToMinutes(value);
+			if (minutes === null) return null;
+			const hour = Math.floor(minutes / 60);
+			return hour >= 5 && hour < 15 ? 'day-shift' : 'night-shift';
+		};
+
 		const {
 			jobType, // For permanent jobs: 'part-time', 'full-time', etc.
 			workingPattern, // 'day-shift', 'night-shift', etc.
@@ -340,14 +362,21 @@ export async function filterJobsForCandidates(req, res) {
 
 			// Filter by working pattern (time field)
 			if (workingPattern) {
-				const timeLower = (shift.time || '').toLowerCase();
-				if (workingPattern.toLowerCase() === 'day-shift') {
-					if (!timeLower.includes('day') && !timeLower.includes('morning') && !timeLower.includes('afternoon')) {
-						return false;
-					}
-				} else if (workingPattern.toLowerCase() === 'night-shift') {
-					if (!timeLower.includes('night') && !timeLower.includes('evening')) {
-						return false;
+				const desiredPattern = workingPattern.toLowerCase();
+				const shiftLabel = getShiftLabelFromTime(shift.time);
+				if (shiftLabel) {
+					if (desiredPattern === 'day-shift' && shiftLabel !== 'day-shift') return false;
+					if (desiredPattern === 'night-shift' && shiftLabel !== 'night-shift') return false;
+				} else {
+					const timeLower = (shift.time || '').toLowerCase();
+					if (desiredPattern === 'day-shift') {
+						if (!timeLower.includes('day') && !timeLower.includes('morning') && !timeLower.includes('afternoon')) {
+							return false;
+						}
+					} else if (desiredPattern === 'night-shift') {
+						if (!timeLower.includes('night') && !timeLower.includes('evening')) {
+							return false;
+						}
 					}
 				}
 			}
@@ -398,14 +427,21 @@ export async function filterJobsForCandidates(req, res) {
 
 			// Filter by working pattern (workingHours field)
 			if (workingPattern) {
-				const workingHoursLower = (job.workingHours || '').toLowerCase();
-				if (workingPattern.toLowerCase() === 'day-shift') {
-					if (!workingHoursLower.includes('day') && !workingHoursLower.includes('morning') && !workingHoursLower.includes('afternoon')) {
-						return false;
-					}
-				} else if (workingPattern.toLowerCase() === 'night-shift') {
-					if (!workingHoursLower.includes('night') && !workingHoursLower.includes('evening')) {
-						return false;
+				const desiredPattern = workingPattern.toLowerCase();
+				const shiftLabel = getShiftLabelFromTime(job.workingHours);
+				if (shiftLabel) {
+					if (desiredPattern === 'day-shift' && shiftLabel !== 'day-shift') return false;
+					if (desiredPattern === 'night-shift' && shiftLabel !== 'night-shift') return false;
+				} else {
+					const workingHoursLower = (job.workingHours || '').toLowerCase();
+					if (desiredPattern === 'day-shift') {
+						if (!workingHoursLower.includes('day') && !workingHoursLower.includes('morning') && !workingHoursLower.includes('afternoon')) {
+							return false;
+						}
+					} else if (desiredPattern === 'night-shift') {
+						if (!workingHoursLower.includes('night') && !workingHoursLower.includes('evening')) {
+							return false;
+						}
 					}
 				}
 			}
