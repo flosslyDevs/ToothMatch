@@ -14,7 +14,13 @@ export async function uploadUserMedia(req, res) {
 	if (!kind) return res.status(400).json({ message: 'kind is required' });
 	try {
 		const url = buildFileUrl(req, file.path);
-		const media = await Media.create({ userId, kind, url });
+		let media = null;
+		// Replace media if its cover or profile picture
+		if (kind === 'cover' || kind === 'profile_picture' ) {
+			media = await Media.update({ url }, { where: { userId, kind } });
+		} else {
+			media = await Media.create({ userId, kind, url });
+		}
 		return res.status(201).json({ media });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
@@ -37,12 +43,21 @@ export async function uploadPracticeMedia(req, res) {
     
     const { kind } = req.body; // e.g., 'logo', 'clinic_photo', 'team_photo'
     if (!kind) return res.status(400).json({ message: 'kind is required' });
+	if (kind === 'logo' && files.length > 1) {
+		return res.status(400).json({ message: 'Maximum 1 logo allowed per request' });
+	}
     
     try {
         const mediaItems = [];
         for (const file of files) {
             const url = buildFileUrl(req, file.path);
-            const media = await PracticeMedia.create({ userId, kind, url });
+			let media = null;
+			// Replace media if its logo
+			if (kind === 'logo') {
+				media = await PracticeMedia.update({ url }, { where: { userId, kind } });
+			} else {
+				media = await PracticeMedia.create({ userId, kind, url });
+			}
             mediaItems.push(media);
         }
         

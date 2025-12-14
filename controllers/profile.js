@@ -183,8 +183,13 @@ export async function uploadMedia(req, res) {
 	const userId = req.user.sub;
 	
 	try {
-		// Replace the media with the new one
-		const media = await Media.update({ url }, { where: { userId, kind } });
+		let media = null;
+		// Replace media if its cover or profile picture
+		if (kind === 'cover' || kind === 'profile_picture' ) {
+			media = await Media.update({ url }, { where: { userId, kind } });
+		} else {
+			media = await Media.create({ userId, kind, url });
+		}
 		return res.status(201).json({ media });
 	} catch (error) {
 		return res.status(500).json({ message: error.message });
