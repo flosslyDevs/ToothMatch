@@ -26,110 +26,106 @@ import Match from './match/match.js';
 import Rating from './shared/rating.js';
 import Blocklist from './profile/blocklist.js';
 import Report from './profile/report.js';
-import { sequelize } from '../services/db.js';
 
-// Associations - only set up if sequelize is initialized
-if (sequelize && User && CandidateProfile) {
-	CandidateProfile.belongsTo(User, { foreignKey: 'userId' });
-	User.hasOne(CandidateProfile, { foreignKey: 'userId' });
+CandidateProfile.belongsTo(User, { foreignKey: 'userId' });
+User.hasOne(CandidateProfile, { foreignKey: 'userId' });
 
-	Education.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(Education, { foreignKey: 'userId' });
+Education.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(Education, { foreignKey: 'userId' });
 
-	WorkExperience.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(WorkExperience, { foreignKey: 'userId' });
+WorkExperience.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(WorkExperience, { foreignKey: 'userId' });
 
-	WorkPersonality.belongsTo(User, { foreignKey: 'userId' });
-	User.hasOne(WorkPersonality, { foreignKey: 'userId' });
+WorkPersonality.belongsTo(User, { foreignKey: 'userId' });
+User.hasOne(WorkPersonality, { foreignKey: 'userId' });
 
-	User.belongsToMany(Skill, { through: UserSkill, foreignKey: 'userId' });
-	Skill.belongsToMany(User, { through: UserSkill, foreignKey: 'skillId' });
+User.belongsToMany(Skill, { through: UserSkill, foreignKey: 'userId' });
+Skill.belongsToMany(User, { through: UserSkill, foreignKey: 'skillId' });
 
-	User.belongsToMany(Specialization, { through: UserSpecialization, foreignKey: 'userId' });
-	Specialization.belongsToMany(User, { through: UserSpecialization, foreignKey: 'specializationId' });
+User.belongsToMany(Specialization, { through: UserSpecialization, foreignKey: 'userId' });
+Specialization.belongsToMany(User, { through: UserSpecialization, foreignKey: 'specializationId' });
 
-	// Join table associations
-	UserSkill.belongsTo(User, { foreignKey: 'userId' });
-	UserSkill.belongsTo(Skill, { foreignKey: 'skillId' });
-	User.hasMany(UserSkill, { foreignKey: 'userId' });
-	Skill.hasMany(UserSkill, { foreignKey: 'skillId' });
+// Join table associations
+UserSkill.belongsTo(User, { foreignKey: 'userId' });
+UserSkill.belongsTo(Skill, { foreignKey: 'skillId' });
+User.hasMany(UserSkill, { foreignKey: 'userId' });
+Skill.hasMany(UserSkill, { foreignKey: 'skillId' });
 
-	UserSpecialization.belongsTo(User, { foreignKey: 'userId' });
-	UserSpecialization.belongsTo(Specialization, { foreignKey: 'specializationId' });
-	User.hasMany(UserSpecialization, { foreignKey: 'userId' });
-	Specialization.hasMany(UserSpecialization, { foreignKey: 'specializationId' });
+UserSpecialization.belongsTo(User, { foreignKey: 'userId' });
+UserSpecialization.belongsTo(Specialization, { foreignKey: 'specializationId' });
+User.hasMany(UserSpecialization, { foreignKey: 'userId' });
+Specialization.hasMany(UserSpecialization, { foreignKey: 'specializationId' });
 
-	Media.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(Media, { foreignKey: 'userId' });
+Media.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(Media, { foreignKey: 'userId' });
 
-	IdentityDocument.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(IdentityDocument, { foreignKey: 'userId' });
+IdentityDocument.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(IdentityDocument, { foreignKey: 'userId' });
 
-	JobPreference.belongsTo(User, { foreignKey: 'userId' });
-	User.hasOne(JobPreference, { foreignKey: 'userId' });
+JobPreference.belongsTo(User, { foreignKey: 'userId' });
+User.hasOne(JobPreference, { foreignKey: 'userId' });
 
-	AvailabilitySlot.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(AvailabilitySlot, { foreignKey: 'userId' });
+AvailabilitySlot.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(AvailabilitySlot, { foreignKey: 'userId' });
 
-	// Practice associations
-	PracticeProfile.belongsTo(User, { foreignKey: 'userId' });
-	User.hasOne(PracticeProfile, { foreignKey: 'userId' });
+// Practice associations
+PracticeProfile.belongsTo(User, { foreignKey: 'userId' });
+User.hasOne(PracticeProfile, { foreignKey: 'userId' });
 
-	PracticeMedia.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(PracticeMedia, { foreignKey: 'userId' });
+PracticeMedia.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(PracticeMedia, { foreignKey: 'userId' });
 
-	PracticeLocation.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(PracticeLocation, { foreignKey: 'userId' });
+PracticeLocation.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(PracticeLocation, { foreignKey: 'userId' });
 
-	PracticeCompliance.belongsTo(User, { foreignKey: 'userId' });
-	User.hasOne(PracticeCompliance, { foreignKey: 'userId' });
+PracticeCompliance.belongsTo(User, { foreignKey: 'userId' });
+User.hasOne(PracticeCompliance, { foreignKey: 'userId' });
 
-	// Practice Profile associations with related models
-	PracticeProfile.hasMany(PracticeMedia, { foreignKey: 'userId', sourceKey: 'userId' });
-	PracticeMedia.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+// Practice Profile associations with related models
+PracticeProfile.hasMany(PracticeMedia, { foreignKey: 'userId', sourceKey: 'userId' });
+PracticeMedia.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
 
-	PracticeProfile.hasMany(PracticeLocation, { foreignKey: 'userId', sourceKey: 'userId' });
-	PracticeLocation.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+PracticeProfile.hasMany(PracticeLocation, { foreignKey: 'userId', sourceKey: 'userId' });
+PracticeLocation.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
 
-	PracticeProfile.hasOne(PracticeCompliance, { foreignKey: 'userId', sourceKey: 'userId' });
-	PracticeCompliance.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+PracticeProfile.hasOne(PracticeCompliance, { foreignKey: 'userId', sourceKey: 'userId' });
+PracticeCompliance.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
 
-	PracticePayment.belongsTo(User, { foreignKey: 'userId' });
-	User.hasOne(PracticePayment, { foreignKey: 'userId' });
+PracticePayment.belongsTo(User, { foreignKey: 'userId' });
+User.hasOne(PracticePayment, { foreignKey: 'userId' });
 
-	PracticeCulture.belongsTo(User, { foreignKey: 'userId' });
-	User.hasOne(PracticeCulture, { foreignKey: 'userId' });
+PracticeCulture.belongsTo(User, { foreignKey: 'userId' });
+User.hasOne(PracticeCulture, { foreignKey: 'userId' });
 
-	// Locum Shift associations
-	LocumShift.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(LocumShift, { foreignKey: 'userId' });
+// Locum Shift associations
+LocumShift.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(LocumShift, { foreignKey: 'userId' });
 
-	LocumShift.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
-	PracticeProfile.hasMany(LocumShift, { foreignKey: 'userId', sourceKey: 'userId' });
+LocumShift.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+PracticeProfile.hasMany(LocumShift, { foreignKey: 'userId', sourceKey: 'userId' });
 
-	// Permanent Job associations
-	PermanentJob.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(PermanentJob, { foreignKey: 'userId' });
+// Permanent Job associations
+PermanentJob.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(PermanentJob, { foreignKey: 'userId' });
 
-	PermanentJob.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
-	PracticeProfile.hasMany(PermanentJob, { foreignKey: 'userId', sourceKey: 'userId' });
+PermanentJob.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+PracticeProfile.hasMany(PermanentJob, { foreignKey: 'userId', sourceKey: 'userId' });
 
-	// Interview associations
-	Interview.belongsTo(User, { foreignKey: 'practiceUserId', as: 'Practice' });
-	Interview.belongsTo(User, { foreignKey: 'candidateUserId', as: 'Candidate' });
-	User.hasMany(Interview, { foreignKey: 'practiceUserId', as: 'ScheduledInterviews' });
-	User.hasMany(Interview, { foreignKey: 'candidateUserId', as: 'CandidateInterviews' });
+// Interview associations
+Interview.belongsTo(User, { foreignKey: 'practiceUserId', as: 'Practice' });
+Interview.belongsTo(User, { foreignKey: 'candidateUserId', as: 'Candidate' });
+User.hasMany(Interview, { foreignKey: 'practiceUserId', as: 'ScheduledInterviews' });
+User.hasMany(Interview, { foreignKey: 'candidateUserId', as: 'CandidateInterviews' });
 
-	// Event associations
-	Event.belongsTo(User, { foreignKey: 'userId' });
-	User.hasMany(Event, { foreignKey: 'userId' });
+// Event associations
+Event.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(Event, { foreignKey: 'userId' });
 
-	Booking.belongsTo(Event, { foreignKey: 'eventId' });
-	Event.hasMany(Booking, { foreignKey: 'eventId' });
+Booking.belongsTo(Event, { foreignKey: 'eventId' });
+Event.hasMany(Booking, { foreignKey: 'eventId' });
 
-	User.hasMany(Booking, { foreignKey: 'userId' });
-	Booking.belongsTo(User, { foreignKey: 'userId' });
-}
+User.hasMany(Booking, { foreignKey: 'userId' });
+Booking.belongsTo(User, { foreignKey: 'userId' });
 
 export {
 	User,
