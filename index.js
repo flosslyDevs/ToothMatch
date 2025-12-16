@@ -1,6 +1,8 @@
 import 'dotenv/config';
+import http from 'http';
 import express, { json } from 'express';
 import morgan from 'morgan';
+import path from 'path';
 import { connectToDatabase } from './services/db.js';
 import authRouter from './api/auth.js';
 import configRouter from './api/config.js';
@@ -14,6 +16,7 @@ import eventsRouter from './api/events.js';
 import matchRouter from './api/match.js';
 import interviewRouter from './api/interview.js';
 import chatRouter from './api/chat.js';
+import { createSocketServer } from './socket/index.js';
 
 const app = express();
 
@@ -41,14 +44,17 @@ app.get('/health', (req, res) => {
 });
 
 // Database connection
-
 connectToDatabase().catch(() => {
 	process.exitCode = 1;
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+const server = http.createServer(app);
+
+// Socket.IO setup
+createSocketServer(server);
+
+server.listen(port, () => {
 	console.log(`Server listening on port ${port}`);
 });
-
 
