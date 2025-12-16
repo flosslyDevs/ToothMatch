@@ -13,7 +13,7 @@ import jobsRouter from './api/jobs.js';
 import eventsRouter from './api/events.js';
 import matchRouter from './api/match.js';
 import interviewRouter from './api/interview.js';
-import path from 'path';
+import chatRouter from './api/chat.js';
 
 const app = express();
 
@@ -31,6 +31,7 @@ app.use('/api/jobs', jobsRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/match', matchRouter);
 app.use('/api/interview', interviewRouter);
+app.use('/api/chat', chatRouter);
 // Serve uploads folder statically
 app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
