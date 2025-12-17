@@ -523,3 +523,114 @@ export async function declineInterview(req, res) {
 	}
 }
 
+// Candidate: Accept (confirm) an interview
+export async function acceptInterview(req, res) {
+	const candidateUserId = req.user?.sub;
+	const { id } = req.params;
+
+	try {
+		if (!candidateUserId) {
+			return res.status(401).json({ message: 'User not authenticated' });
+		}
+
+		// Verify user is a candidate
+		const candidate = await User.findByPk(candidateUserId);
+		if (!candidate || candidate.role !== 'candidate') {
+			return res.status(403).json({ message: 'Only candidates can accept interviews' });
+		}
+
+		// Find the interview
+		const interview = await Interview.findByPk(id);
+		if (!interview) {
+			return res.status(404).json({ message: 'Interview not found' });
+		}
+
+		// Verify the interview belongs to this candidate
+		if (interview.candidateUserId !== candidateUserId) {
+			return res.status(403).json({ message: 'You can only accept your own interviews' });
+		}
+
+		// Prevent accepting declined / cancelled / completed interviews
+		if (interview.declined || ['cancelled', 'completed'].includes(interview.status)) {
+			return res.status(400).json({ message: 'This interview cannot be accepted' });
+		}
+
+		// If already confirmed, just return success with current data
+		if (interview.status === 'confirmed') {
+			const existingInterview = await Interview.findByPk(interview.id, {
+				include: [
+					{
+						model: User,
+						as: 'Practice',
+						attributes: ['id', 'email'],
+						include: [{
+							model: PracticeProfile,
+							attributes: ['id', 'clinicType', 'phoneNumber']
+						}]
+					},
+					{
+						model: User,
+						as: 'Candidate',
+						attributes: ['id', 'email'],
+						include: [{
+							model: CandidateProfile,
+							attributes: ['id', 'fullName', 'jobTitle']
+						}]
+					}
+				]
+			});
+
+			return res.status(200).json({
+				message: 'Interview already confirmed',
+				interview: existingInterview
+			});
+		}
+
+		// Mark interview as confirmed
+		await interview.update({
+			status: 'confirmed',
+			// Clear any pending reschedule request when candidate confirms
+			rescheduleRequested: false,
+			rescheduleRequestDate: null,
+			rescheduleRequestReason: null,
+			rescheduleRequestedDate: null,
+			rescheduleRequestedTime: null
+		});
+
+		// Fetch updated interview with related data
+		const updatedInterview = await Interview.findByPk(interview.id, {
+			include: [
+				{
+					model: User,
+					as: 'Practice',
+					attributes: ['id', 'email'],
+					include: [{
+						model: PracticeProfile,
+						attributes: ['id', 'clinicType', 'phoneNumber']
+					}]
+				},
+				{
+					model: User,
+					as: 'Candidate',
+					attributes: ['id', 'email'],
+					include: [{
+						model: CandidateProfile,
+						attributes: ['id', 'fullName', 'jobTitle']
+					}]
+				}
+			]
+		});
+
+		return res.status(200).json({ 
+			message: 'Interview accepted successfully',
+			interview: updatedInterview 
+		});
+	} catch (error) {
+		console.error('Error accepting interview:', error);
+		return res.status(500).json({ 
+			message: 'Error accepting interview',
+			error: error.message 
+		});
+	}
+}
+
