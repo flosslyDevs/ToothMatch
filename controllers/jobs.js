@@ -1,4 +1,4 @@
-import { LocumShift, PermanentJob, User, PracticeProfile, PracticeLocation, PracticeMedia, JobPreference, CandidateProfile } from '../models/index.js';
+import { LocumShift, PermanentJob, User, PracticeProfile, PracticeLocation, PracticeMedia, JobPreference, CandidateProfile, Media } from '../models/index.js';
 import { Op } from 'sequelize';
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
@@ -309,7 +309,15 @@ export async function filterJobsForCandidates(req, res) {
 				},
 				{
 					model: PracticeProfile,
-					attributes: ['clinicType', 'website', 'phoneNumber']
+					attributes: ['clinicType', 'website', 'phoneNumber'],
+					required: false,
+					include: [
+						{
+							model: PracticeMedia,
+							attributes: ['kind', 'url'],
+							required: false
+						}
+					]
 				}
 			]
 		});
@@ -324,7 +332,15 @@ export async function filterJobsForCandidates(req, res) {
 				},
 				{
 					model: PracticeProfile,
-					attributes: ['clinicType', 'website', 'phoneNumber']
+					attributes: ['clinicType', 'website', 'phoneNumber'],
+					required: false,
+					include: [
+						{
+							model: PracticeMedia,
+							attributes: ['kind', 'url'],
+							required: false
+						}
+					]
 				}
 			]
 		});
@@ -492,12 +508,29 @@ export async function filterJobsForCandidates(req, res) {
 			const shiftData = shift.toJSON();
 			delete shiftData.User;
 			delete shiftData.PracticeProfile;
+
+			// derive avatar from practice media if available (prefer 'logo')
+			let avatar = null;
+			const pp = shift.PracticeProfile;
+			if (pp && pp.PracticeMedia && Array.isArray(pp.PracticeMedia)) {
+				const logo = pp.PracticeMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
+				const any = pp.PracticeMedia[0];
+				avatar = logo ? logo.url : (any ? any.url : null);
+			}
+
+			const practiceProfile = {
+				clinicType: pp?.clinicType ?? null,
+				website: pp?.website ?? null,
+				phoneNumber: pp?.phoneNumber ?? null,
+				avatar
+			};
+
 			return {
 				...shiftData,
 				jobType: 'locum',
 				jobTypeLabel: 'Locum Shift',
 				user: shift.User,
-				practiceProfile: shift.PracticeProfile
+				practiceProfile
 			};
 		});
 
@@ -506,12 +539,29 @@ export async function filterJobsForCandidates(req, res) {
 			const jobData = job.toJSON();
 			delete jobData.User;
 			delete jobData.PracticeProfile;
+
+			// derive avatar from practice media if available (prefer 'logo')
+			let avatar = null;
+			const pp = job.PracticeProfile;
+			if (pp && pp.PracticeMedia && Array.isArray(pp.PracticeMedia)) {
+				const logo = pp.PracticeMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
+				const any = pp.PracticeMedia[0];
+				avatar = logo ? logo.url : (any ? any.url : null);
+			}
+
+			const practiceProfile = {
+				clinicType: pp?.clinicType ?? null,
+				website: pp?.website ?? null,
+				phoneNumber: pp?.phoneNumber ?? null,
+				avatar
+			};
+
 			return {
 				...jobData,
 				jobType: 'permanent',
 				jobTypeLabel: 'Permanent Job',
 				user: job.User,
-				practiceProfile: job.PracticeProfile
+				practiceProfile
 			};
 		});
 
@@ -594,6 +644,10 @@ export async function filterCandidatesForPractices(req, res) {
                                 'longitude',
                                 'searchRadiusKm'
                             ]
+                        },
+                        {
+                            model: Media,
+                            attributes: ['kind', 'url']
                         }
                     ]
                 }
@@ -682,6 +736,19 @@ export async function filterCandidatesForPractices(req, res) {
         // shape response
         const results = paginated.map(c => {
             const json = c.toJSON();
+            const userMedia = Array.isArray(json.User?.Media) ? json.User.Media : [];
+
+            // derive avatar from candidate media (prefer 'profile_picture', then 'logo', then first)
+            let avatar = null;
+            if (userMedia.length > 0) {
+                const profilePic = userMedia.find(m => (m.kind || '').toLowerCase() === 'profile_picture');
+                const logo = userMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
+                avatar = profilePic ? profilePic.url : (logo ? logo.url : null);
+            }
+
+            // Strip Media from the nested User object before returning
+            const { Media: _ignoredMedia, ...userWithoutMedia } = json.User || {};
+
             // keep only needed fields
             return {
                 id: json.id,
@@ -691,7 +758,8 @@ export async function filterCandidatesForPractices(req, res) {
                 currentStatus: json.currentStatus,
                 linkedinUrl: json.linkedinUrl,
                 aboutMe: json.aboutMe,
-                user: json.User,
+                avatar,
+                user: userWithoutMedia,
                 preferences: json.User ? json.User.JobPreference : null
             };
         });
