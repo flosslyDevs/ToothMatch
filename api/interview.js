@@ -7,7 +7,8 @@ import {
 	getMyInterviews,
 	requestReschedule,
 	approveReschedule,
-	declineInterview
+	declineInterview,
+	acceptInterview
 } from '../controllers/interview.js';
 
 const router = express.Router();
@@ -32,6 +33,9 @@ router.post('/:id/reschedule-request', requestReschedule);
 
 // Practice: Approve reschedule and update interview date/time
 router.put('/:id/reschedule', approveReschedule);
+
+// Candidate: Accept (confirm) an interview
+router.post('/:id/accept', acceptInterview);
 
 // Candidate: Decline an interview
 router.post('/:id/decline', declineInterview);
