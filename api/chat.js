@@ -1,6 +1,6 @@
-import express from 'express';
-import { authMiddleware } from '../utils/auth.js';
-import { getChatHistory } from '../controllers/chat.js';
+import express from "express";
+import { authMiddleware } from "../utils/auth.js";
+import { getChatHistory, getChats } from "../controllers/chat.js";
 
 const router = express.Router();
 
@@ -8,8 +8,11 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // Get chat history between authenticated user and a recipient
-// GET /api/chat/history?receiverId=xxx&beforeMessageId=xxx
-router.get('/history', getChatHistory);
+// GET /history?receiverId=xxx&beforeMessageId=xxx
+router.get("/history", getChatHistory);
+
+// Get chats list for the current user
+// GET /
+router.get("/", getChats);
 
 export default router;
-
