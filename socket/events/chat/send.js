@@ -9,24 +9,24 @@ const handleChatSend = async (socket, io, data) => {
     const receiverId = data.receiverId;
 
     console.log("Chat send event received from ", socket.id);
-    
+
     // Validate required fields
     if (!message || !receiverId) {
-      socket.emit('chat:error', { 
-        message: 'Invalid message or receiver ID',
-        code: 'MISSING_FIELDS'
+      socket.emit("chat:error", {
+        message: "Invalid message or receiver ID",
+        code: "MISSING_FIELDS",
       });
       return;
     }
 
     // Get user ID for sender
     const senderId = getUserForSocket(socket.id);
-    
+
     // Validate sender is authenticated
     if (!senderId) {
-      socket.emit('chat:error', { 
-        message: 'Not authenticated',
-        code: 'NOT_AUTHENTICATED'
+      socket.emit("chat:error", {
+        message: "Not authenticated",
+        code: "NOT_AUTHENTICATED",
       });
       return;
     }
@@ -34,9 +34,9 @@ const handleChatSend = async (socket, io, data) => {
     const receiver = await User.findByPk(receiverId);
 
     if (!receiver) {
-      socket.emit('chat:error', { 
-        message: 'Receiver not found',
-        code: 'RECEIVER_NOT_FOUND'
+      socket.emit("chat:error", {
+        message: "Receiver not found",
+        code: "RECEIVER_NOT_FOUND",
       });
       return;
     }
@@ -44,21 +44,22 @@ const handleChatSend = async (socket, io, data) => {
     // Verify message validity
     const trimmedMessage = message.trim();
     const isMessageToSelf = senderId === receiverId;
-    const isMessageValid = trimmedMessage.length > 0 && !isMessageToSelf && message.length < 1000;
+    const isMessageValid =
+      trimmedMessage.length > 0 && !isMessageToSelf && message.length < 1000;
 
     if (!isMessageValid) {
-      let reason = 'Invalid message';
+      let reason = "Invalid message";
       if (isMessageToSelf) {
-        reason = 'Cannot send message to self';
+        reason = "Cannot send message to self";
       } else if (trimmedMessage.length === 0) {
-        reason = 'Message cannot be empty';
+        reason = "Message cannot be empty";
       } else if (message.length >= 1000) {
-        reason = 'Message too long (max 1000 characters)';
+        reason = "Message too long (max 1000 characters)";
       }
-      
-      socket.emit('chat:error', { 
+
+      socket.emit("chat:error", {
         message: reason,
-        code: 'INVALID_MESSAGE'
+        code: "INVALID_MESSAGE",
       });
       return;
     }
@@ -98,9 +99,10 @@ const handleChatSend = async (socket, io, data) => {
 
     // Check permission
     if (!isPermitted) {
-      socket.emit('chat:error', { 
-        message: 'No permission to send message. You must have a confirmed or completed interview with this user.',
-        code: 'NO_PERMISSION'
+      socket.emit("chat:error", {
+        message:
+          "No permission to send message. You must have a confirmed or completed interview with this user.",
+        code: "NO_PERMISSION",
       });
       return;
     }
@@ -116,7 +118,7 @@ const handleChatSend = async (socket, io, data) => {
     const receiverSocketIds = getSocketsForUser(receiverId);
 
     if (receiverSocketIds.size > 0) {
-      receiverSocketIds.forEach(socketId => {
+      receiverSocketIds.forEach((socketId) => {
         io.to(socketId).emit("chat:receive", {
           id: savedMessage.id,
           senderId,
@@ -133,13 +135,12 @@ const handleChatSend = async (socket, io, data) => {
       message: trimmedMessage,
       createdAt: savedMessage.createdAt,
     });
-
   } catch (error) {
-    console.error('Error handling chat send:', error);
-    socket.emit('chat:error', {
-      message: 'Failed to send message',
-      code: 'SERVER_ERROR',
-      error: error.message
+    console.error("Error handling chat send:", error);
+    socket.emit("chat:error", {
+      message: "Failed to send message",
+      code: "SERVER_ERROR",
+      error: error.message,
     });
   }
 };
