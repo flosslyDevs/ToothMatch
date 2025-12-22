@@ -26,6 +26,7 @@ import Match from './match/match.js';
 import Rating from './shared/rating.js';
 import Blocklist from './profile/blocklist.js';
 import Report from './profile/report.js';
+import ChatMessage from './chat/message.js';
 
 CandidateProfile.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(CandidateProfile, { foreignKey: 'userId' });
@@ -127,10 +128,18 @@ Event.hasMany(Booking, { foreignKey: 'eventId' });
 User.hasMany(Booking, { foreignKey: 'userId' });
 Booking.belongsTo(User, { foreignKey: 'userId' });
 
+// Chat associations
+ChatMessage.belongsTo(User, { foreignKey: 'senderId' });
+User.hasMany(ChatMessage, { foreignKey: 'senderId' });
+
+ChatMessage.belongsTo(User, { foreignKey: 'receiverId' });
+User.hasMany(ChatMessage, { foreignKey: 'receiverId' });
+
 export {
 	User,
 	Booking,
 	Event,
+	ChatMessage,
 	CandidateProfile,
 	Education,
 	WorkExperience,
