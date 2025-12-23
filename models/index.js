@@ -1,4 +1,5 @@
 import User from './auth/users.js';
+import UserFCMToken from './auth/userFCMToken.js';
 import {Event, Booking} from './events/index.js';
 import CandidateProfile from './profile/candidateProfile.js';
 import Education from './profile/education.js';
@@ -135,8 +136,13 @@ User.hasMany(ChatMessage, { foreignKey: 'senderId' });
 ChatMessage.belongsTo(User, { foreignKey: 'receiverId' });
 User.hasMany(ChatMessage, { foreignKey: 'receiverId' });
 
+// FCM Token associations
+UserFCMToken.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(UserFCMToken, { foreignKey: 'userId' });
+
 export {
 	User,
+	UserFCMToken,
 	Booking,
 	Event,
 	ChatMessage,

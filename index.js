@@ -16,7 +16,6 @@ import eventsRouter from './api/events.js';
 import matchRouter from './api/match.js';
 import interviewRouter from './api/interview.js';
 import chatRouter from './api/chat.js';
-import { createSocketServer } from './socket/index.js';
 
 const app = express();
 
@@ -50,9 +49,6 @@ connectToDatabase().catch(() => {
 
 const port = process.env.PORT || 3000;
 const server = http.createServer(app);
-
-// Socket.IO setup
-createSocketServer(server);
 
 server.listen(port, () => {
 	console.log(`Server listening on port ${port}`);

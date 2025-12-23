@@ -1,5 +1,6 @@
-import { ChatMessage } from "../models/index.js";
+import { ChatMessage, Interview, User, UserFCMToken } from "../models/index.js";
 import { Op, Sequelize } from "sequelize";
+import { sendChatNotification } from "../utils/fcm.js";
 
 /**
  * Get chat history between the authenticated user and a recipient
@@ -220,5 +221,220 @@ export async function getChats(req, res) {
     return res
       .status(500)
       .json({ message: error.message || "Internal server error" });
+  }
+}
+
+/**
+ * Send a chat message to a recipient
+ * Uses FCM to send push notifications instead of socket.io
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ *
+ * Body parameters:
+ * - receiverId (required): UUID of the recipient
+ * - message (required): Message text (max 1000 characters)
+ *
+ * Returns the created message and FCM send status
+ */
+export async function sendMessage(req, res) {
+  try {
+    const senderId = req.user.sub; // Authenticated user ID from JWT
+    const { receiverId, message } = req.body;
+
+    console.log(
+      `[sendMessage] senderId: ${senderId}, receiverId: ${receiverId}, message length: ${message?.length}`
+    );
+
+    // Validate required fields
+    if (!message || !receiverId) {
+      return res.status(400).json({
+        message: "Invalid message or receiver ID",
+        code: "MISSING_FIELDS",
+      });
+    }
+
+    // Validate sender is authenticated
+    if (!senderId) {
+      return res.status(401).json({
+        message: "Not authenticated",
+        code: "NOT_AUTHENTICATED",
+      });
+    }
+
+    // Check if receiver exists
+    const receiver = await User.findByPk(receiverId);
+    if (!receiver) {
+      return res.status(404).json({
+        message: "Receiver not found",
+        code: "RECEIVER_NOT_FOUND",
+      });
+    }
+
+    // Verify message validity
+    const trimmedMessage = message.trim();
+    const isMessageToSelf = senderId === receiverId;
+    const isMessageValid =
+      trimmedMessage.length > 0 && !isMessageToSelf && message.length < 1000;
+
+    if (!isMessageValid) {
+      let reason = "Invalid message";
+      if (isMessageToSelf) {
+        reason = "Cannot send message to self";
+      } else if (trimmedMessage.length === 0) {
+        reason = "Message cannot be empty";
+      } else if (message.length >= 1000) {
+        reason = "Message too long (max 1000 characters)";
+      }
+
+      return res.status(400).json({
+        message: reason,
+        code: "INVALID_MESSAGE",
+      });
+    }
+
+    // Check if there are any confirmed or completed interviews between the two users
+    const interviewsCount = await Interview.count({
+      where: {
+        [Op.and]: [
+          {
+            [Op.or]: [
+              {
+                candidateUserId: senderId,
+                practiceUserId: receiverId,
+              },
+              {
+                candidateUserId: receiverId,
+                practiceUserId: senderId,
+              },
+            ],
+          },
+          {
+            [Op.or]: [
+              {
+                status: "confirmed",
+              },
+              {
+                status: "completed",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    /** If there are any confirmed or completed interviews between the two users, the user is permitted to send a message */
+    const isPermitted = interviewsCount > 0;
+
+    // Check permission
+    if (!isPermitted) {
+      return res.status(403).json({
+        message:
+          "No permission to send message. You must have a confirmed or completed interview with this user.",
+        code: "NO_PERMISSION",
+      });
+    }
+
+    // Get sender info for notification
+    const sender = await User.findByPk(senderId);
+    const senderName = sender?.fullName || "Someone";
+    const senderAvatar = null; // Can be enhanced later to fetch from profile media
+
+    // Create message in database
+    const savedMessage = await ChatMessage.create({
+      senderId,
+      receiverId,
+      message: trimmedMessage,
+    });
+
+    // Send FCM notification to all receiver's registered devices
+    const receiverTokens = await UserFCMToken.findAll({
+      where: { userId: receiverId },
+    });
+
+    let fcmResults = {
+      total: receiverTokens.length,
+      successful: 0,
+      failed: 0,
+    };
+
+    if (receiverTokens.length > 0) {
+      const messageData = {
+        id: savedMessage.id,
+        senderId,
+        message: trimmedMessage,
+        createdAt: savedMessage.createdAt,
+      };
+
+      // Send notifications to all tokens in parallel
+      const fcmPromises = receiverTokens.map((token) =>
+        sendChatNotification(
+          token.fcmToken,
+          messageData,
+          senderName,
+          senderAvatar
+        )
+      );
+
+      const results = await Promise.allSettled(fcmPromises);
+
+      // Process results and clean up invalid tokens
+      const invalidTokenIds = [];
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          if (result.value.success) {
+            fcmResults.successful++;
+          } else {
+            fcmResults.failed++;
+            // If token is invalid, mark for deletion
+            if (result.value.error === "INVALID_TOKEN") {
+              invalidTokenIds.push(receiverTokens[index].id);
+            }
+          }
+        } else {
+          fcmResults.failed++;
+          console.error(
+            `[sendMessage] FCM promise rejected for token ${receiverTokens[index].id}:`,
+            result.reason
+          );
+        }
+      });
+
+      // Clean up invalid tokens
+      if (invalidTokenIds.length > 0) {
+        await UserFCMToken.destroy({
+          where: { id: { [Op.in]: invalidTokenIds } },
+        });
+        console.log(
+          `[sendMessage] Removed ${invalidTokenIds.length} invalid FCM tokens for user ${receiverId}`
+        );
+      }
+    } else {
+      console.log(
+        `[sendMessage] Receiver ${receiverId} has no FCM tokens, skipping notification`
+      );
+    }
+
+    return res.status(201).json({
+      message: {
+        id: savedMessage.id,
+        senderId,
+        receiverId,
+        message: trimmedMessage,
+        createdAt: savedMessage.createdAt,
+      },
+      fcmSent: fcmResults.successful > 0,
+      fcmResults,
+    });
+  } catch (error) {
+    console.error(
+      `[sendMessage] Error sending message for userId=${req?.user?.sub}. Error:`,
+      error
+    );
+    return res.status(500).json({
+      message: "Failed to send message",
+      code: "SERVER_ERROR",
+      error: error.message,
+    });
   }
 }
