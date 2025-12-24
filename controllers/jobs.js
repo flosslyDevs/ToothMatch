@@ -23,7 +23,6 @@ export async function getPractitionerJobs(req, res) {
 		const locumShifts = await LocumShift.findAll({
 			where: { 
 				userId: practitionerId,
-				status: 'active' // Only active shifts
 			},
 			include: [
 				{
@@ -42,7 +41,6 @@ export async function getPractitionerJobs(req, res) {
 		const permanentJobs = await PermanentJob.findAll({
 			where: { 
 				userId: practitionerId,
-				status: 'active' // Only active jobs
 			},
 			include: [
 				{
@@ -113,12 +111,12 @@ export async function getPractitionerJobs(req, res) {
 	}
 }
 
-// Get all active jobs (both locum shifts and permanent jobs) - public endpoint
-export async function getAllActiveJobs(req, res) {
+// Get all jobs (both locum shifts and permanent jobs) - public endpoint
+export async function getAllJobs(req, res) {
 	try {
 		// Get all active locum shifts
         const locumShifts = await LocumShift.findAll({
-			where: { status: 'active' },
+			where: {},
 			include: [
 				{
 					model: User,
@@ -142,7 +140,6 @@ export async function getAllActiveJobs(req, res) {
 
 		// Get all active permanent jobs
         const permanentJobs = await PermanentJob.findAll({
-			where: { status: 'active' },
 			include: [
 				{
 					model: User,
@@ -283,6 +280,7 @@ export async function filterJobsForCandidates(req, res) {
 			salaryPreferenceMax, // Maximum salary preference (50000)
 			candidateLat, // Candidate's latitude for location-based filtering
 			candidateLng, // Candidate's longitude for location-based filtering
+			status, // status of the job, null for all
 			page = 1,
 			limit = 10
 		} = req.query;
@@ -290,15 +288,19 @@ export async function filterJobsForCandidates(req, res) {
 		const offset = (parseInt(page) - 1) * parseInt(limit);
 
 		// Build where clause for permanent jobs
-		const permanentJobWhere = { status: 'active' };
-		
+		const permanentJobWhere = {};
+		if (status) {
+			permanentJobWhere.status = status;
+		}
 		if (jobType) {
 			permanentJobWhere.jobType = { [Op.iLike]: `%${jobType}%` };
 		}
 
 		// Build where clause for locum shifts
-		const locumShiftWhere = { status: 'active' };
-
+		const locumShiftWhere = {};
+		if (status) {
+			locumShiftWhere.status = status;
+		}
 		// Get all active locum shifts with filters
 		const allLocumShifts = await LocumShift.findAll({
 			where: locumShiftWhere,
