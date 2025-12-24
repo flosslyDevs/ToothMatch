@@ -4,7 +4,6 @@ import {
   getChatHistory,
   getChats,
   sendMessage,
-  updateFCMToken,
 } from "../controllers/chat.js";
 
 const router = express.Router();
