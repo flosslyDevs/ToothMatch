@@ -9,6 +9,7 @@ import {
 	verifyEmail,
 	googleAuth,
 	appleAuth,
+	addFCMToken,
 } from '../controllers/auth.js';
 
 const router = express.Router();
@@ -58,5 +59,9 @@ router.post('/apple', async (req, res) => {
 	const result = await appleAuth({ req, body: req.body });
 	return res.status(result?.status || 200).json(result?.body ?? result);
 });
+
+// Add FCM token for push notifications
+// POST /fcm-token
+router.post("/add-fcm-token", addFCMToken);
 
 export default router;

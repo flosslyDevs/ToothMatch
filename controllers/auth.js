@@ -312,11 +312,94 @@ export async function resendOtp(event) {
 		return { status: 500, body: { message: 'Unable to resend OTP', error: error?.message || String(error) } };
 	}
 }
+/**
+ * Add FCM token for the authenticated user
+ * Supports multiple devices - each device can register its own token
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ *
+ * Body parameters:
+ * - fcmToken (required): FCM token string
+ * - deviceId (optional): Unique identifier for the device (e.g., device UUID)
+ * - deviceType (optional): Type of device ('ios', 'android', 'web')
+ *
+ * Returns success status
+ */
+export async function addFCMToken(req, res) {
+  try {
+    const userId = req.user.sub;
+    const { fcmToken, deviceId, deviceType } = req.body;
 
-export async function profile() { return { status: 501, body: { message: 'Not implemented' } }; }
-export async function userLoginHistory() { return { status: 501, body: { message: 'Not implemented' } }; }
-export async function updateProfile() { return { status: 501, body: { message: 'Not implemented' } }; }
-export async function updatePassword() { return { status: 501, body: { message: 'Not implemented' } }; }
+    if (!fcmToken) {
+      return res.status(400).json({
+        message: "FCM token is required",
+        code: "MISSING_TOKEN",
+      });
+    }
 
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+        code: "USER_NOT_FOUND",
+      });
+    }
 
+    // Find or create token (upsert based on fcmToken)
+    // If the same token exists, update it; otherwise create new
+    const [token, created] = await UserFCMToken.findOrCreate({
+      where: { fcmToken },
+      defaults: {
+        userId,
+        fcmToken,
+        deviceId: deviceId || null,
+        deviceType: deviceType || null,
+      },
+    });
+
+    if (!created) {
+      // Token exists - update userId, deviceId, and deviceType
+      // This handles the case where a token might have been registered for a different user
+      await token.update({
+        userId,
+        deviceId: deviceId || token.deviceId,
+        deviceType: deviceType || token.deviceType,
+      });
+    }
+
+    // If deviceId is provided, remove old tokens for this device (to prevent duplicates)
+    if (deviceId) {
+      await UserFCMToken.destroy({
+        where: {
+          userId,
+          deviceId,
+          id: { [Op.ne]: token.id },
+        },
+      });
+    }
+
+    const action = created ? "Created" : "Updated";
+    const deviceInfo = deviceId ? ` (device: ${deviceId})` : "";
+    console.log(
+      `[updateFCMToken] ${action} FCM token for user ${userId}${deviceInfo}`
+    );
+
+    return res.status(200).json({
+      message: "FCM token updated successfully",
+      created,
+      tokenId: token.id,
+    });
+  } catch (error) {
+    console.error(
+      `[updateFCMToken] Error updating FCM token for userId=${req?.user?.sub}. Error:`,
+      error
+    );
+    return res.status(500).json({
+      message: "Failed to update FCM token",
+      code: "SERVER_ERROR",
+      error: error.message,
+    });
+  }
+}
 
