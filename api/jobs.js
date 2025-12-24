@@ -1,6 +1,6 @@
 import express from 'express';
 import { authMiddleware } from '../utils/auth.js';
-import { getPractitionerJobs, getAllActiveJobs, filterJobsForCandidates, filterCandidatesForPractices, activateJob, pauseJob } from '../controllers/jobs.js';
+import { getPractitionerJobs, getAllJobs, filterJobsForCandidates, filterCandidatesForPractices, activateJob, pauseJob } from '../controllers/jobs.js';
 
 const router = express.Router();
 
@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/practitioner/:practitionerId', getPractitionerJobs);
 
 // Public route - Get all active jobs (both locum and permanent)
-router.get('/public/all', getAllActiveJobs);
+router.get('/public/all', getAllJobs);
 
 // Public route - Filter jobs for candidates with multiple filter options
 router.get('/public/filter', filterJobsForCandidates);
