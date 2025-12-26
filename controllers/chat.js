@@ -420,10 +420,13 @@ export async function sendMessage(req, res) {
 
       // Process results and clean up invalid tokens
       const invalidTokenIds = [];
+      const validTokenIds = [];
       results.forEach((result, index) => {
         if (result.status === "fulfilled") {
           if (result.value.success) {
             fcmResults.successful++;
+            // Track valid tokens to update lastUsedAt
+            validTokenIds.push(receiverTokens[index].id);
           } else {
             fcmResults.failed++;
             // If token is invalid, mark for deletion
@@ -439,6 +442,14 @@ export async function sendMessage(req, res) {
           );
         }
       });
+
+      // Update lastUsedAt for successfully used tokens
+      if (validTokenIds.length > 0) {
+        await UserFCMToken.update(
+          { lastUsedAt: new Date() },
+          { where: { id: { [Op.in]: validTokenIds } } }
+        );
+      }
 
       // Clean up invalid tokens
       if (invalidTokenIds.length > 0) {

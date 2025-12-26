@@ -28,6 +28,11 @@ const UserFCMToken = sequelize.define('UserFCMToken', {
     type: DataTypes.ENUM('ios', 'android', 'web', 'other'),
     allowNull: true,
   },
+  lastUsedAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+    allowNull: false,
+  },
   createdAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

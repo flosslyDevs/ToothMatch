@@ -11,51 +11,92 @@ function getBody(event) {
 	return event?.body || event?.req?.body || {};
 }
 
+const deviceTypes = ['ios', 'android', 'web', 'other'];
+
 /**
  * Helper function to update FCM token for a user
  * @param {string} userId - User ID
- * @param {string} fcmToken - FCM token (optional)
+ * @param {string} fcmToken - FCM token (required)
  * @param {string} deviceId - Device ID (optional)
  * @param {string} deviceType - Device type (optional)
  */
 async function updateFCMTokenForUser(userId, fcmToken, deviceId, deviceType) {
 	if (!fcmToken) {
-		return; // Silently skip if no token provided
+		throw new Error('FCM token is required');
+	}
+
+	if (!userId) {
+		throw new Error('User ID is required');
+	}
+
+	if (deviceType && !deviceTypes.includes(deviceType)) {
+		throw new Error('Device type must be one of: ' + deviceTypes.join(', '));
 	}
 
 	try {
-		// Find or create token (upsert based on fcmToken)
-		const [token, created] = await UserFCMToken.findOrCreate({
+		// Find existing token by fcmToken
+		const existingToken = await UserFCMToken.findOne({
 			where: { fcmToken },
-			defaults: {
+		});
+
+		let token;
+		let action;
+
+		if (existingToken) {
+			// Token exists - check ownership
+			if (existingToken.userId !== userId) {
+				// Token belongs to different user - delete old token and create new one
+				// This prevents token hijacking and ensures proper ownership
+				console.log(
+					`[updateFCMToken] Token belongs to different user, reassigning to ${userId}`
+				);
+				await existingToken.destroy();
+				token = await UserFCMToken.create({
+					userId,
+					fcmToken,
+					deviceId: deviceId || null,
+					deviceType: deviceType || null,
+					lastUsedAt: new Date(),
+				});
+				action = "Created (reassigned)";
+			} else {
+				// Token belongs to same user - update device info and lastUsedAt
+				await existingToken.update({
+					deviceId: deviceId || existingToken.deviceId,
+					deviceType: deviceType || existingToken.deviceType,
+					lastUsedAt: new Date(),
+				});
+				token = existingToken;
+				action = "Updated";
+			}
+		} else {
+			// Token doesn't exist - create new one
+			token = await UserFCMToken.create({
 				userId,
 				fcmToken,
 				deviceId: deviceId || null,
 				deviceType: deviceType || null,
-			},
-		});
-
-		if (!created) {
-			// Token exists - update userId, deviceId, and deviceType
-			await token.update({
-				userId,
-				deviceId: deviceId || token.deviceId,
-				deviceType: deviceType || token.deviceType,
+				lastUsedAt: new Date(),
 			});
+			action = "Created";
 		}
 
-		// If deviceId is provided, remove old tokens for this device (to prevent duplicates)
+		// If deviceId is provided, remove old tokens for this user+device combination
 		if (deviceId) {
-			await UserFCMToken.destroy({
+			const deletedCount = await UserFCMToken.destroy({
 				where: {
 					userId,
 					deviceId,
 					id: { [Op.ne]: token.id },
 				},
 			});
+			if (deletedCount > 0) {
+				console.log(
+					`[updateFCMToken] Removed ${deletedCount} old token(s) for user ${userId} on device ${deviceId}`
+				);
+			}
 		}
 
-		const action = created ? "Created" : "Updated";
 		const deviceInfo = deviceId ? ` (device: ${deviceId})` : "";
 		console.log(
 			`[updateFCMToken] ${action} FCM token for user ${userId}${deviceInfo}`
@@ -140,7 +181,11 @@ export async function login(event) {
 	
 	// Update FCM token if provided
 	if (fcmToken) {
-		await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+		try {
+			await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+		} catch (error) {
+			return { status: 401, body: { message: error.message } };
+		}
 	}
 	
 	// Check if profile is complete
@@ -203,7 +248,11 @@ export async function googleAuth(event) {
 		
 		// Update FCM token if provided
 		if (fcmToken) {
-			await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+			try {
+				await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+			} catch (error) {
+				return { status: 401, body: { message: error.message } };
+			}
 		}
 		
 		// Check if profile is complete
@@ -273,7 +322,11 @@ export async function appleAuth(event) {
 	
 	// Update FCM token if provided
 	if (fcmToken) {
-		await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+		try {
+			await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+		} catch (error) {
+			return { status: 401, body: { message: error.message } };
+		}
 	}
 	
 	// Check if profile is complete
