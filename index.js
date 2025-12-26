@@ -16,6 +16,7 @@ import eventsRouter from './api/events.js';
 import matchRouter from './api/match.js';
 import interviewRouter from './api/interview.js';
 import chatRouter from './api/chat.js';
+import { initializeFCM } from './utils/fcm.js';
 
 const app = express();
 
@@ -45,6 +46,11 @@ app.get('/health', (req, res) => {
 // Database connection
 connectToDatabase().catch(() => {
 	process.exitCode = 1;
+});
+
+// FCM Init
+initializeFCM() || (() => {
+	throw new Error('Failed to initialize FCM');
 });
 
 const port = process.env.PORT || 3000;
