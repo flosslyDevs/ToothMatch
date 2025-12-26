@@ -1,11 +1,12 @@
 import admin from "firebase-admin";
+import fs from "fs";
 
 // Initialize Firebase Admin if not already initialized
 let fcmInitialized = false;
 
 export const initializeFCM = () => {
   if (fcmInitialized) {
-    return;
+    return true;
   }
 
   // Check if Firebase Admin is already initialized
