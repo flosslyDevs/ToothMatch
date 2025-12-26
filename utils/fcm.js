@@ -11,10 +11,7 @@ export const initializeFCM = () => {
 
   // Check if Firebase Admin is already initialized
   if (admin.apps.length === 0) {
-    // Initialize with service account credentials from environment
-    // FIREBASE_SERVICE_ACCOUNT should be a JSON string or path to JSON file
     if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON_PATH) {
-      // read file as JSON
       const serviceAccount = JSON.parse(
         fs.readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_JSON_PATH, "utf8")
       );
