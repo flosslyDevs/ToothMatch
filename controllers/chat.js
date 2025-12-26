@@ -207,14 +207,54 @@ export async function getChats(req, res) {
       `[getChats] Fetched ${chats.length} chats for userId=${userId}`
     );
 
-    return res.status(200).json({
-      chats: chats.map((c) => ({
+    const availableToChatInterviews = await Interview.findAll({
+      where: {
+        [Op.or]: [
+          {
+            candidateUserId: userId,
+          },
+          {
+            practiceUserId: userId,
+          },
+        ],
+        [Op.or]: [
+          {
+            status: "confirmed",
+          },
+          {
+            status: "completed",
+          },
+        ],
+      },
+      order: [["updatedAt", "DESC"]],
+    });
+
+    const availableToChat = availableToChatInterviews.map((i) => ({
+      participants: [i.practiceUserId, i.candidateUserId],
+      timestamp: i.updatedAt,
+    }));
+
+    const chatsData = chats.map((c) => ({
+      participants: [c.senderId, c.receiverId],
+      timestamp: c.createdAt,
+      message: {
         id: c.id,
         senderId: c.senderId,
-        receiverId: c.receiverId,
         message: c.message,
-        createdAt: c.createdAt,
-      })),
+      },
+    }));
+
+    const uniqueChats = [...chatsData, ...availableToChat].filter(
+      (c, index, self) =>
+        index ===
+        self.findIndex(
+          (t) =>
+            t.participants.sort().join(",") === c.participants.sort().join(",")
+        )
+    );
+
+    return res.status(200).json({
+      chats: uniqueChats.sort((a, b) => b.timestamp - a.timestamp),
     });
   } catch (error) {
     console.error("Error fetching chats:", error);
@@ -423,8 +463,6 @@ export async function sendMessage(req, res) {
         message: trimmedMessage,
         createdAt: savedMessage.createdAt,
       },
-      fcmSent: fcmResults.successful > 0,
-      fcmResults,
     });
   } catch (error) {
     console.error(
