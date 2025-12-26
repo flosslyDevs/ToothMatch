@@ -1,13 +1,72 @@
 import bcrypt from 'bcrypt';
 import User from '../models/auth/users.js';
-import { CandidateProfile, PracticeProfile } from '../models/index.js';
+import { CandidateProfile, PracticeProfile, UserFCMToken } from '../models/index.js';
 import { sendVerificationEmail } from '../utils/email.js';
 import { signUserToken } from '../utils/jwt.js';
 import { OAuth2Client } from 'google-auth-library';
 import appleSignin from 'apple-signin-auth';
+import { Op } from 'sequelize';
 
 function getBody(event) {
 	return event?.body || event?.req?.body || {};
+}
+
+/**
+ * Helper function to update FCM token for a user
+ * @param {string} userId - User ID
+ * @param {string} fcmToken - FCM token (optional)
+ * @param {string} deviceId - Device ID (optional)
+ * @param {string} deviceType - Device type (optional)
+ */
+async function updateFCMTokenForUser(userId, fcmToken, deviceId, deviceType) {
+	if (!fcmToken) {
+		return; // Silently skip if no token provided
+	}
+
+	try {
+		// Find or create token (upsert based on fcmToken)
+		const [token, created] = await UserFCMToken.findOrCreate({
+			where: { fcmToken },
+			defaults: {
+				userId,
+				fcmToken,
+				deviceId: deviceId || null,
+				deviceType: deviceType || null,
+			},
+		});
+
+		if (!created) {
+			// Token exists - update userId, deviceId, and deviceType
+			await token.update({
+				userId,
+				deviceId: deviceId || token.deviceId,
+				deviceType: deviceType || token.deviceType,
+			});
+		}
+
+		// If deviceId is provided, remove old tokens for this device (to prevent duplicates)
+		if (deviceId) {
+			await UserFCMToken.destroy({
+				where: {
+					userId,
+					deviceId,
+					id: { [Op.ne]: token.id },
+				},
+			});
+		}
+
+		const action = created ? "Created" : "Updated";
+		const deviceInfo = deviceId ? ` (device: ${deviceId})` : "";
+		console.log(
+			`[updateFCMToken] ${action} FCM token for user ${userId}${deviceInfo}`
+		);
+	} catch (error) {
+		// Log error but don't fail login if FCM token update fails
+		console.error(
+			`[updateFCMToken] Error updating FCM token for userId=${userId}. Error:`,
+			error
+		);
+	}
 }
 
 export async function signupRequest(event) {
@@ -69,7 +128,7 @@ export async function verifyEmail(event) {
 }
 
 export async function login(event) {
-	const { email, password } = getBody(event);
+	const { email, password, fcmToken, deviceId, deviceType } = getBody(event);
 	const user = await User.findOne({ where: { email } });
 	if (!user) {
 		return { status: 401, body: { message: 'Invalid credentials' } };
@@ -77,6 +136,11 @@ export async function login(event) {
 	const ok = await bcrypt.compare(password, user.passwordHash);
 	if (!ok) {
 		return { status: 401, body: { message: 'Invalid credentials' } };
+	}
+	
+	// Update FCM token if provided
+	if (fcmToken) {
+		await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
 	}
 	
 	// Check if profile is complete
@@ -95,7 +159,7 @@ export async function login(event) {
 
 // Google OAuth signup/login
 export async function googleAuth(event) {
-	const { idToken, fullName, mobileNumber, role } = getBody(event);
+	const { idToken, fullName, mobileNumber, role, fcmToken, deviceId, deviceType } = getBody(event);
 	if (!idToken) return { status: 400, body: { message: 'Missing idToken' } };
 	
 	// Validate that idToken looks like a JWT (should have 3 segments separated by dots)
@@ -137,6 +201,11 @@ export async function googleAuth(event) {
 			await user.save();
 		}
 		
+		// Update FCM token if provided
+		if (fcmToken) {
+			await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+		}
+		
 		// Check if profile is complete
 		let isProfileComplete = false;
 		if (user.role === 'candidate') {
@@ -173,7 +242,7 @@ export async function googleAuth(event) {
 
 // Apple OAuth signup/login
 export async function appleAuth(event) {
-	const { idToken, fullName, mobileNumber, role } = getBody(event);
+	const { idToken, fullName, mobileNumber, role, fcmToken, deviceId, deviceType } = getBody(event);
 	if (!idToken) return { status: 400, body: { message: 'Missing idToken' } };
 	const payload = await appleSignin.verifyIdToken(idToken, {
 		audience: process.env.APPLE_CLIENT_ID,
@@ -200,6 +269,11 @@ export async function appleAuth(event) {
 		user.oauthSubject = sub;
 		if (!user.isEmailVerified) user.isEmailVerified = true;
 		await user.save();
+	}
+	
+	// Update FCM token if provided
+	if (fcmToken) {
+		await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
 	}
 	
 	// Check if profile is complete
@@ -312,94 +386,3 @@ export async function resendOtp(event) {
 		return { status: 500, body: { message: 'Unable to resend OTP', error: error?.message || String(error) } };
 	}
 }
-/**
- * Add FCM token for the authenticated user
- * Supports multiple devices - each device can register its own token
- *
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- *
- * Body parameters:
- * - fcmToken (required): FCM token string
- * - deviceId (optional): Unique identifier for the device (e.g., device UUID)
- * - deviceType (optional): Type of device ('ios', 'android', 'web')
- *
- * Returns success status
- */
-export async function addFCMToken(req, res) {
-  try {
-    const userId = req.user.sub;
-    const { fcmToken, deviceId, deviceType } = req.body;
-
-    if (!fcmToken) {
-      return res.status(400).json({
-        message: "FCM token is required",
-        code: "MISSING_TOKEN",
-      });
-    }
-
-    const user = await User.findByPk(userId);
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-        code: "USER_NOT_FOUND",
-      });
-    }
-
-    // Find or create token (upsert based on fcmToken)
-    // If the same token exists, update it; otherwise create new
-    const [token, created] = await UserFCMToken.findOrCreate({
-      where: { fcmToken },
-      defaults: {
-        userId,
-        fcmToken,
-        deviceId: deviceId || null,
-        deviceType: deviceType || null,
-      },
-    });
-
-    if (!created) {
-      // Token exists - update userId, deviceId, and deviceType
-      // This handles the case where a token might have been registered for a different user
-      await token.update({
-        userId,
-        deviceId: deviceId || token.deviceId,
-        deviceType: deviceType || token.deviceType,
-      });
-    }
-
-    // If deviceId is provided, remove old tokens for this device (to prevent duplicates)
-    if (deviceId) {
-      await UserFCMToken.destroy({
-        where: {
-          userId,
-          deviceId,
-          id: { [Op.ne]: token.id },
-        },
-      });
-    }
-
-    const action = created ? "Created" : "Updated";
-    const deviceInfo = deviceId ? ` (device: ${deviceId})` : "";
-    console.log(
-      `[updateFCMToken] ${action} FCM token for user ${userId}${deviceInfo}`
-    );
-
-    return res.status(200).json({
-      message: "FCM token updated successfully",
-      created,
-      tokenId: token.id,
-    });
-  } catch (error) {
-    console.error(
-      `[updateFCMToken] Error updating FCM token for userId=${req?.user?.sub}. Error:`,
-      error
-    );
-    return res.status(500).json({
-      message: "Failed to update FCM token",
-      code: "SERVER_ERROR",
-      error: error.message,
-    });
-  }
-}
-
