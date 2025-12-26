@@ -12,36 +12,25 @@ export const initializeFCM = () => {
   if (admin.apps.length === 0) {
     // Initialize with service account credentials from environment
     // FIREBASE_SERVICE_ACCOUNT should be a JSON string or path to JSON file
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      try {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-        admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount),
-        });
-      } catch (error) {
-        console.error("Error parsing FIREBASE_SERVICE_ACCOUNT:", error);
-        // If parsing fails, try as file path
-        admin.initializeApp({
-          credential: admin.credential.cert(
-            process.env.FIREBASE_SERVICE_ACCOUNT
-          ),
-        });
-      }
-    } else if (process.env.FIREBASE_PROJECT_ID) {
-      // Initialize with default credentials (for GCP environments)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON_PATH) {
+      // read file as JSON
+      const serviceAccount = JSON.parse(
+        fs.readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_JSON_PATH, "utf8")
+      );
       admin.initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID,
+        credential: admin.credential.cert(serviceAccount),
       });
     } else {
       console.warn(
-        "FCM not initialized: Missing FIREBASE_SERVICE_ACCOUNT or FIREBASE_PROJECT_ID"
+        "FCM not initialized: Missing FIREBASE_SERVICE_ACCOUNT_JSON_PATH"
       );
-      return;
+      return false;
     }
   }
 
   fcmInitialized = true;
   console.log("FCM initialized successfully");
+  return true;
 };
 
 /**
