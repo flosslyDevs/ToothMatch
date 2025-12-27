@@ -1,6 +1,10 @@
 import express from "express";
 import { authMiddleware } from "../utils/auth.js";
-import { getChatHistory, getChats } from "../controllers/chat.js";
+import {
+  getChatHistory,
+  getChats,
+  sendMessage,
+} from "../controllers/chat.js";
 
 const router = express.Router();
 
@@ -14,5 +18,9 @@ router.get("/history", getChatHistory);
 // Get chats list for the current user
 // GET /
 router.get("/", getChats);
+
+// Send a message to a recipient
+// POST /send
+router.post("/send", sendMessage);
 
 export default router;

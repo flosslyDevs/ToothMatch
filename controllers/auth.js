@@ -1,13 +1,113 @@
 import bcrypt from 'bcrypt';
 import User from '../models/auth/users.js';
-import { CandidateProfile, PracticeProfile } from '../models/index.js';
+import { CandidateProfile, PracticeProfile, UserFCMToken } from '../models/index.js';
 import { sendVerificationEmail } from '../utils/email.js';
 import { signUserToken } from '../utils/jwt.js';
 import { OAuth2Client } from 'google-auth-library';
 import appleSignin from 'apple-signin-auth';
+import { Op } from 'sequelize';
 
 function getBody(event) {
 	return event?.body || event?.req?.body || {};
+}
+
+const deviceTypes = ['ios', 'android', 'web', 'other'];
+
+/**
+ * Helper function to update FCM token for a user
+ * @param {string} userId - User ID
+ * @param {string} fcmToken - FCM token (required)
+ * @param {string} deviceId - Device ID (optional)
+ * @param {string} deviceType - Device type (optional)
+ */
+async function updateFCMTokenForUser(userId, fcmToken, deviceId, deviceType) {
+	if (!fcmToken) {
+		throw new Error('FCM token is required');
+	}
+
+	if (!userId) {
+		throw new Error('User ID is required');
+	}
+
+	if (deviceType && !deviceTypes.includes(deviceType)) {
+		throw new Error('Device type must be one of: ' + deviceTypes.join(', '));
+	}
+
+	try {
+		// Find existing token by fcmToken
+		const existingToken = await UserFCMToken.findOne({
+			where: { fcmToken },
+		});
+
+		let token;
+		let action;
+
+		if (existingToken) {
+			// Token exists - check ownership
+			if (existingToken.userId !== userId) {
+				// Token belongs to different user - delete old token and create new one
+				// This prevents token hijacking and ensures proper ownership
+				console.log(
+					`[updateFCMToken] Token belongs to different user, reassigning to ${userId}`
+				);
+				await existingToken.destroy();
+				token = await UserFCMToken.create({
+					userId,
+					fcmToken,
+					deviceId: deviceId || null,
+					deviceType: deviceType || null,
+					lastUsedAt: new Date(),
+				});
+				action = "Created (reassigned)";
+			} else {
+				// Token belongs to same user - update device info and lastUsedAt
+				await existingToken.update({
+					deviceId: deviceId || existingToken.deviceId,
+					deviceType: deviceType || existingToken.deviceType,
+					lastUsedAt: new Date(),
+				});
+				token = existingToken;
+				action = "Updated";
+			}
+		} else {
+			// Token doesn't exist - create new one
+			token = await UserFCMToken.create({
+				userId,
+				fcmToken,
+				deviceId: deviceId || null,
+				deviceType: deviceType || null,
+				lastUsedAt: new Date(),
+			});
+			action = "Created";
+		}
+
+		// If deviceId is provided, remove old tokens for this user+device combination
+		if (deviceId) {
+			const deletedCount = await UserFCMToken.destroy({
+				where: {
+					userId,
+					deviceId,
+					id: { [Op.ne]: token.id },
+				},
+			});
+			if (deletedCount > 0) {
+				console.log(
+					`[updateFCMToken] Removed ${deletedCount} old token(s) for user ${userId} on device ${deviceId}`
+				);
+			}
+		}
+
+		const deviceInfo = deviceId ? ` (device: ${deviceId})` : "";
+		console.log(
+			`[updateFCMToken] ${action} FCM token for user ${userId}${deviceInfo}`
+		);
+	} catch (error) {
+		// Log error but don't fail login if FCM token update fails
+		console.error(
+			`[updateFCMToken] Error updating FCM token for userId=${userId}. Error:`,
+			error
+		);
+	}
 }
 
 export async function signupRequest(event) {
@@ -69,7 +169,7 @@ export async function verifyEmail(event) {
 }
 
 export async function login(event) {
-	const { email, password } = getBody(event);
+	const { email, password, fcmToken, deviceId, deviceType } = getBody(event);
 	const user = await User.findOne({ where: { email } });
 	if (!user) {
 		return { status: 401, body: { message: 'Invalid credentials' } };
@@ -77,6 +177,15 @@ export async function login(event) {
 	const ok = await bcrypt.compare(password, user.passwordHash);
 	if (!ok) {
 		return { status: 401, body: { message: 'Invalid credentials' } };
+	}
+	
+	// Update FCM token if provided
+	if (fcmToken) {
+		try {
+			await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+		} catch (error) {
+			return { status: 401, body: { message: error.message } };
+		}
 	}
 	
 	// Check if profile is complete
@@ -95,7 +204,7 @@ export async function login(event) {
 
 // Google OAuth signup/login
 export async function googleAuth(event) {
-	const { idToken, fullName, mobileNumber, role } = getBody(event);
+	const { idToken, fullName, mobileNumber, role, fcmToken, deviceId, deviceType } = getBody(event);
 	if (!idToken) return { status: 400, body: { message: 'Missing idToken' } };
 	
 	// Validate that idToken looks like a JWT (should have 3 segments separated by dots)
@@ -137,6 +246,15 @@ export async function googleAuth(event) {
 			await user.save();
 		}
 		
+		// Update FCM token if provided
+		if (fcmToken) {
+			try {
+				await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+			} catch (error) {
+				return { status: 401, body: { message: error.message } };
+			}
+		}
+		
 		// Check if profile is complete
 		let isProfileComplete = false;
 		if (user.role === 'candidate') {
@@ -173,7 +291,7 @@ export async function googleAuth(event) {
 
 // Apple OAuth signup/login
 export async function appleAuth(event) {
-	const { idToken, fullName, mobileNumber, role } = getBody(event);
+	const { idToken, fullName, mobileNumber, role, fcmToken, deviceId, deviceType } = getBody(event);
 	if (!idToken) return { status: 400, body: { message: 'Missing idToken' } };
 	const payload = await appleSignin.verifyIdToken(idToken, {
 		audience: process.env.APPLE_CLIENT_ID,
@@ -200,6 +318,15 @@ export async function appleAuth(event) {
 		user.oauthSubject = sub;
 		if (!user.isEmailVerified) user.isEmailVerified = true;
 		await user.save();
+	}
+	
+	// Update FCM token if provided
+	if (fcmToken) {
+		try {
+			await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
+		} catch (error) {
+			return { status: 401, body: { message: error.message } };
+		}
 	}
 	
 	// Check if profile is complete
@@ -312,11 +439,3 @@ export async function resendOtp(event) {
 		return { status: 500, body: { message: 'Unable to resend OTP', error: error?.message || String(error) } };
 	}
 }
-
-export async function profile() { return { status: 501, body: { message: 'Not implemented' } }; }
-export async function userLoginHistory() { return { status: 501, body: { message: 'Not implemented' } }; }
-export async function updateProfile() { return { status: 501, body: { message: 'Not implemented' } }; }
-export async function updatePassword() { return { status: 501, body: { message: 'Not implemented' } }; }
-
-
-

@@ -16,7 +16,7 @@ import eventsRouter from './api/events.js';
 import matchRouter from './api/match.js';
 import interviewRouter from './api/interview.js';
 import chatRouter from './api/chat.js';
-import { createSocketServer } from './socket/index.js';
+import { initializeFCM } from './utils/fcm.js';
 
 const app = express();
 
@@ -48,11 +48,13 @@ connectToDatabase().catch(() => {
 	process.exitCode = 1;
 });
 
+// FCM Init
+initializeFCM() || (() => {
+	throw new Error('Failed to initialize FCM');
+});
+
 const port = process.env.PORT || 3000;
 const server = http.createServer(app);
-
-// Socket.IO setup
-createSocketServer(server);
 
 server.listen(port, () => {
 	console.log(`Server listening on port ${port}`);
