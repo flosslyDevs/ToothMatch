@@ -94,7 +94,7 @@ export const sendFCMNotification = async (
 /**
  * Send a chat message notification via FCM
  * @param {string} fcmToken - The FCM token of the recipient device
- * @param {object} messageData - Message data (id, senderId, message, createdAt)
+ * @param {object} messageData - Message data
  * @param {string} senderName - Name of the sender
  * @param {string} senderAvatar - Avatar of the sender
  * @returns {Promise<Object>} FCM send result
@@ -109,9 +109,8 @@ export const sendChatNotification = async (
   const data = {
     type: "chat",
     messageId: String(messageData.id),
-    senderId: String(messageData.senderId),
+    threadId: String(messageData.threadId),
     senderName: String(senderName || ""),
-    senderAvatar: String(senderAvatar || ""),
     message: String(messageData.message || ""),
     timestamp: new Date(messageData.createdAt).toISOString(),
   };
@@ -121,6 +120,7 @@ export const sendChatNotification = async (
     {
       title: data.senderName || "New Message",
       body: data.message || "",
+      imageUrl: senderAvatar,
     },
     data
   );
