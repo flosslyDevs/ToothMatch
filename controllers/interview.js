@@ -1,5 +1,4 @@
-import { Interview, User, PracticeProfile, CandidateProfile } from '../models/index.js';
-import { Op } from 'sequelize';
+import { Interview, User, PracticeProfile, CandidateProfile, PracticeMedia } from '../models/index.js';
 
 // Schedule an interview (Practice side)
 export async function scheduleInterview(req, res) {
@@ -205,15 +204,25 @@ export async function getMyInterviews(req, res) {
 				where: { candidateUserId: userId },
 				include: [
 					{
-						model: User,
-						as: 'Practice',
-						attributes: ['id', 'email'],
-						include: [{
-							model: PracticeProfile,
-							attributes: ['id', 'clinicType', 'phoneNumber']
-						}]
-					}
-				],
+					  model: User,
+					  as: "Practice",
+					  attributes: ["id", "email", "fullName"],
+					  include: [
+						{
+						  model: PracticeProfile,
+						  attributes: ["id", "clinicType", "phoneNumber"],
+						},
+						{
+						  model: PracticeMedia,
+						  attributes: ["id", "kind", "url"],
+						  required: false,
+						  where: {
+							kind: "logo",
+						  },
+						},
+					  ],
+					},
+				  ],
 				order: [['date', 'ASC'], ['time', 'ASC']]
 			});
 		} else if (user.role === 'practice') {
@@ -225,10 +234,20 @@ export async function getMyInterviews(req, res) {
 						model: User,
 						as: 'Candidate',
 						attributes: ['id', 'email'],
-						include: [{
-							model: CandidateProfile,
-							attributes: ['id', 'fullName', 'jobTitle']
-						}]
+						include: [
+							{
+								model: CandidateProfile,
+								attributes: ['id', 'fullName', 'jobTitle']
+							},
+							{
+								model: Media,
+								attributes: ['id', 'kind', 'url'],
+								required: false,
+								where: {
+									kind: 'profile_picture',
+								},
+							}
+						]
 					}
 				],
 				order: [['date', 'ASC'], ['time', 'ASC']]
