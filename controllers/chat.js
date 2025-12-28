@@ -1,5 +1,14 @@
-import { ChatMessage, Interview, User, UserFCMToken } from "../models/index.js";
-import { Op, Sequelize } from "sequelize";
+import {
+  ChatMessage,
+  ChatThread,
+  ChatThreadParticipant,
+  Interview,
+  User,
+  UserFCMToken,
+  Media,
+  PracticeMedia,
+} from "../models/index.js";
+import { Op } from "sequelize";
 import { sendChatNotification } from "../utils/fcm.js";
 
 /**
@@ -10,7 +19,8 @@ import { sendChatNotification } from "../utils/fcm.js";
  * @param {Object} res - Express response object
  *
  * Query parameters:
- * - receiverId (required): UUID of the other participant
+ * - threadId (optional): UUID of the thread (if provided, uses this directly)
+ * - receiverId (optional): UUID of the other participant (required if threadId not provided)
  * - beforeMessageId (optional): UUID of message to fetch older messages before (cursor)
  *
  * Returns messages ordered by createdAt DESC (newest first)
@@ -19,54 +29,97 @@ import { sendChatNotification } from "../utils/fcm.js";
 export async function getChatHistory(req, res) {
   try {
     const userId = req.user.sub; // Authenticated user ID from JWT
-    const { receiverId, beforeMessageId } = req.query;
+    const { threadId, receiverId, beforeMessageId } = req.query;
 
     console.log(
-      `[getChatHistory] userId: ${userId}, receiverId: ${receiverId}, beforeMessageId: ${beforeMessageId}`
+      `[getChatHistory] userId: ${userId}, threadId: ${threadId}, receiverId: ${receiverId}, beforeMessageId: ${beforeMessageId}`
     );
 
-    // Validate required parameters
-    if (!receiverId) {
-      console.warn(
-        `[getChatHistory] Missing receiverId param from userId: ${userId}`
-      );
-      return res.status(400).json({
-        message: "receiverId is required",
+    const messageLimit = 10;
+    let resolvedThreadId = null;
+
+    // If threadId is provided, use it directly (but verify user is a participant)
+    if (threadId) {
+      const userParticipant = await ChatThreadParticipant.findOne({
+        where: {
+          threadId,
+          userId,
+        },
+        include: [
+          {
+            model: ChatThread,
+          },
+        ],
       });
+
+      if (!userParticipant) {
+        return res.status(403).json({
+          message: "Thread not found or user is not a participant",
+        });
+      }
+
+      resolvedThreadId = threadId;
+    } else {
+      // Fall back to finding thread by receiverId
+      if (!receiverId) {
+        console.warn(
+          `[getChatHistory] Missing both threadId and receiverId param from userId: ${userId}`
+        );
+        return res.status(400).json({
+          message: "Either threadId or receiverId is required",
+        });
+      }
+
+      // Find thread between userId and receiverId
+      // Get thread where both users are participants
+      const userParticipant = await ChatThreadParticipant.findOne({
+        where: { userId },
+        include: [
+          {
+            model: ChatThread,
+            where: { type: "direct" },
+            include: [
+              {
+                model: ChatThreadParticipant,
+                where: { userId: receiverId },
+                required: true,
+              },
+            ],
+          },
+        ],
+      });
+
+      if (!userParticipant?.ChatThread) {
+        // No thread exists yet, return empty messages
+        return res.status(200).json({
+          messages: [],
+          pagination: {
+            remainingMessagesCount: 0,
+          },
+        });
+      }
+
+      resolvedThreadId = userParticipant.ChatThread.id;
     }
 
-    const messageLimit = 10;
-
-    // Build where clause: messages between userId and receiverId
+    // Build where clause using resolved threadId
     const whereClause = {
-      [Op.or]: [
-        {
-          senderId: userId,
-          receiverId: receiverId,
-        },
-        {
-          senderId: receiverId,
-          receiverId: userId,
-        },
-      ],
+      threadId: resolvedThreadId,
     };
 
     // If beforeMessageId is provided, fetch messages older than that message
     if (beforeMessageId) {
-      // First, verify the message exists and belongs to this conversation
+      // First, verify the message exists and belongs to this thread
       const cursorMessage = await ChatMessage.findOne({
         where: {
           id: beforeMessageId,
-          [Op.or]: [
-            { senderId: userId, receiverId: receiverId },
-            { senderId: receiverId, receiverId: userId },
-          ],
+          threadId: resolvedThreadId,
         },
       });
 
       if (!cursorMessage) {
         console.warn(
-          `[getChatHistory] Cursor message not found or does not belong to this conversation. userId=${userId}, receiverId=${receiverId}, beforeMessageId=${beforeMessageId}`
+          `[getChatHistory] Cursor message not found or does not belong to this thread. userId=${userId}, threadId=${resolvedThreadId}, beforeMessageId=${beforeMessageId}`
         );
         return res.status(404).json({
           message: "Message not found or does not belong to this conversation",
@@ -88,10 +141,11 @@ export async function getChatHistory(req, res) {
       where: whereClause,
       order: [["createdAt", "DESC"]],
       limit: messageLimit,
+      attributes: ["id", "senderId", "message", "createdAt"],
     });
 
     console.log(
-      `[getChatHistory] Fetched ${messages.length} messages for userId=${userId}, receiverId=${receiverId}.`
+      `[getChatHistory] Fetched ${messages.length} messages for userId=${userId}, threadId=${resolvedThreadId}.`
     );
 
     // Determine if there are more messages to load
@@ -100,18 +154,9 @@ export async function getChatHistory(req, res) {
       // Check if there are more messages older than the oldest one we fetched
       const oldestMessage = messages[messages.length - 1];
 
-      // Build base where clause for checking older messages
+      // Build where clause for checking older messages
       const olderWhereClause = {
-        [Op.or]: [
-          {
-            senderId: userId,
-            receiverId: receiverId,
-          },
-          {
-            senderId: receiverId,
-            receiverId: userId,
-          },
-        ],
+        threadId: resolvedThreadId,
         createdAt: {
           [Op.lt]: oldestMessage.createdAt,
         },
@@ -125,7 +170,7 @@ export async function getChatHistory(req, res) {
       );
     } else {
       console.log(
-        `[getChatHistory] No messages found for userId=${userId}, receiverId=${receiverId} with params beforeMessageId=${beforeMessageId}.`
+        `[getChatHistory] No messages found for userId=${userId}, threadId=${resolvedThreadId} with params beforeMessageId=${beforeMessageId}.`
       );
     }
 
@@ -157,104 +202,130 @@ export async function getChatHistory(req, res) {
  */
 export async function getChats(req, res) {
   const userId = req.user.sub;
+  console.log(`[getChats] Called by userId=${userId}`);
 
   if (!userId) {
+    console.warn(`[getChats] No userId found in request`);
     return res.status(401).json({ message: "User not authenticated" });
   }
 
   try {
-    // DB-side grouping: latest message per unique conversation, where (senderId, receiverId)
-    // is treated the same as (receiverId, senderId).
-    //
-    // Implementation uses Postgres DISTINCT ON + a normalized other_user_id (relative to userId).
-    const limit = 100;
-    const offset = 0;
-
-    const sql = `
-      WITH latest AS (
-        SELECT DISTINCT ON (other_user_id)
-          id,
-          sender_id   AS "senderId",
-          receiver_id AS "receiverId",
-          message,
-          created_at  AS "createdAt",
-          updated_at  AS "updatedAt",
-          other_user_id AS "otherUserId"
-        FROM (
-          SELECT
-            cm.*,
-            CASE
-              WHEN cm.sender_id = :userId THEN cm.receiver_id
-              ELSE cm.sender_id
-            END AS other_user_id
-          FROM chat_messages cm
-          WHERE cm.sender_id = :userId OR cm.receiver_id = :userId
-        ) t
-        ORDER BY other_user_id, created_at DESC
-      )
-      SELECT *
-      FROM latest
-      ORDER BY "createdAt" DESC
-      LIMIT :limit OFFSET :offset;
-    `;
-
-    const chats = await ChatMessage.sequelize.query(sql, {
-      replacements: { userId, limit, offset },
-      type: Sequelize.QueryTypes.SELECT,
+    // Get all threads where user is a participant
+    console.log(
+      `[getChats] Fetching chat thread participants for userId=${userId}`
+    );
+    const userParticipants = await ChatThreadParticipant.findAll({
+      where: { userId },
+      include: [
+        {
+          model: ChatThread,
+        },
+      ],
     });
+    console.log(
+      `[getChats] Found ${userParticipants.length} chat threads for userId=${userId}`
+    );
+
+    // Get latest message and other participant for each thread
+    const chatsData = [];
+    for (const participant of userParticipants) {
+      const thread = participant.ChatThread;
+      if (!thread) {
+        console.warn(
+          `[getChats] ChatThread missing for participantId=${participant.id}`
+        );
+        continue;
+      }
+      console.log(`[getChats] Processing threadId=${thread.id}`);
+
+      // Get the latest message for this thread
+      const latestMessage = await ChatMessage.findOne({
+        where: { threadId: thread.id },
+        order: [["createdAt", "DESC"]],
+      });
+      console.log(
+        `[getChats] Latest message for threadId=${thread.id}: ${
+          latestMessage ? latestMessage.id : "none"
+        }`
+      );
+
+      // Get other participant (for direct chats)
+      const otherParticipant = await ChatThreadParticipant.findOne({
+        where: {
+          threadId: thread.id,
+          userId: { [Op.ne]: userId },
+        },
+        include: [
+          {
+            model: User,
+            attributes: ["id", "fullName"],
+            include: [
+              {
+                model: Media,
+                attributes: ["url"],
+                required: false,
+                where: {
+                  kind: "profile_picture",
+                },
+              },
+              {
+                model: PracticeMedia,
+                attributes: ["url"],
+                required: false,
+                where: {
+                  kind: "logo",
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      if (otherParticipant) {
+        console.log(
+          `[getChats] Found other participant for threadId=${thread.id}: userId=${otherParticipant.userId}`
+        );
+        let message = {
+          senderId: null,
+          message: "You started a new conversation",
+        };
+        if (latestMessage) {
+          message = {
+            senderId: latestMessage.senderId,
+            message: latestMessage.message,
+          };
+        }
+        const otherUserData = {
+          id: otherParticipant.userId,
+          name: otherParticipant.User?.fullName || null,
+          avatar:
+            otherParticipant.User?.Media?.[0]?.url ||
+            otherParticipant.PracticeMedia?.[0]?.url ||
+            null,
+        };
+        chatsData.push({
+          threadId: thread.id,
+          otherUser: otherUserData,
+          timestamp: latestMessage?.createdAt ?? thread.createdAt,
+          message,
+        });
+        console.log(
+          `[getChats] Added chat data for threadId=${thread.id} with otherUserId=${otherUserData.id}`
+        );
+      } else {
+        console.warn(
+          `[getChats] No other participant found for threadId=${thread.id}`
+        );
+      }
+    }
 
     console.log(
-      `[getChats] Fetched ${chats.length} chats for userId=${userId}`
+      `[getChats] Returning ${chatsData.length} chats for userId=${userId}`
     );
-
-    const availableToChatInterviews = await Interview.findAll({
-      where: {
-        [Op.or]: [
-          {
-            candidateUserId: userId,
-          },
-          {
-            practiceUserId: userId,
-          },
-        ],
-        [Op.or]: [
-          {
-            status: "confirmed",
-          },
-          {
-            status: "completed",
-          },
-        ],
-      },
-      order: [["updatedAt", "DESC"]],
-    });
-
-    const availableToChat = availableToChatInterviews.map((i) => ({
-      participants: [i.practiceUserId, i.candidateUserId],
-      timestamp: i.updatedAt,
-    }));
-
-    const chatsData = chats.map((c) => ({
-      participants: [c.senderId, c.receiverId],
-      timestamp: c.createdAt,
-      message: {
-        id: c.id,
-        senderId: c.senderId,
-        message: c.message,
-      },
-    }));
-
-    const uniqueChats = [...chatsData, ...availableToChat].filter(
-      (c, index, self) =>
-        index ===
-        self.findIndex(
-          (t) =>
-            t.participants.sort().join(",") === c.participants.sort().join(",")
-        )
-    );
-
     return res.status(200).json({
-      chats: uniqueChats.sort((a, b) => b.timestamp - a.timestamp),
+      chats: chatsData.sort(
+        (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+      ),
     });
   } catch (error) {
     console.error("Error fetching chats:", error);
@@ -376,12 +447,81 @@ export async function sendMessage(req, res) {
     }
 
     // Get sender info for notification
-    const sender = await User.findByPk(senderId);
+    const sender = await User.findByPk(senderId, {
+      include: [
+        {
+          model: Media,
+          attributes: ["url"],
+          required: false,
+          where: {
+            kind: "profile_picture",
+          },
+        },
+        {
+          model: PracticeMedia,
+          attributes: ["url"],
+          required: false,
+          where: {
+            kind: "logo",
+          },
+        },
+      ],
+    });
     const senderName = sender?.fullName || "Someone";
-    const senderAvatar = null; // Can be enhanced later to fetch from profile media
+    const senderAvatar =
+      sender?.Media?.[0]?.url || sender?.PracticeMedia?.[0]?.url || null;
+
+    // Find or create thread between sender and receiver
+    // Get thread where both users are participants
+    const senderParticipant = await ChatThreadParticipant.findOne({
+      where: { userId: senderId },
+      include: [
+        {
+          model: ChatThread,
+          where: { type: "direct" },
+          include: [
+            {
+              model: ChatThreadParticipant,
+              where: { userId: receiverId },
+              required: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    let thread = senderParticipant?.ChatThread;
+
+    // If thread doesn't exist, create it
+    if (!thread) {
+      thread = await ChatThread.create({
+        type: "direct",
+      });
+
+      // Create participants for both users
+      await ChatThreadParticipant.create({
+        threadId: thread.id,
+        userId: senderId,
+      });
+
+      await ChatThreadParticipant.create({
+        threadId: thread.id,
+        userId: receiverId,
+      });
+    }
+
+    // Update thread's updatedAt timestamp
+    await thread.update({ updatedAt: new Date() });
+
+    // Update sender's lastReadAt in ChatThreadParticipant
+    await ChatThreadParticipant.update(
+      { lastReadAt: new Date() },
+      { where: { threadId: thread.id, userId: senderId } }
+    );
 
     // Create message in database
     const savedMessage = await ChatMessage.create({
+      threadId: thread.id,
       senderId,
       receiverId,
       message: trimmedMessage,
@@ -401,7 +541,7 @@ export async function sendMessage(req, res) {
     if (receiverTokens.length > 0) {
       const messageData = {
         id: savedMessage.id,
-        senderId,
+        threadId: thread.id,
         message: trimmedMessage,
         createdAt: savedMessage.createdAt,
       };
@@ -483,6 +623,173 @@ export async function sendMessage(req, res) {
     return res.status(500).json({
       message: "Failed to send message",
       code: "SERVER_ERROR",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Mark a thread as read for the authenticated user
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ *
+ * URL parameters:
+ * - threadId (required): UUID of the thread
+ */
+export async function markThreadAsRead(req, res) {
+  try {
+    const userId = req.user.sub;
+    const { threadId } = req.params;
+
+    if (!threadId) {
+      return res.status(400).json({
+        message: "threadId is required",
+      });
+    }
+
+    // Verify user is a participant in this thread
+    const participant = await ChatThreadParticipant.findOne({
+      where: {
+        threadId,
+        userId,
+      },
+    });
+
+    if (!participant) {
+      return res.status(404).json({
+        message: "Thread not found or user is not a participant",
+      });
+    }
+
+    // Update lastReadAt
+    await participant.update({
+      lastReadAt: new Date(),
+    });
+
+    return res.status(200).json({
+      message: "Thread marked as read",
+      lastReadAt: participant.lastReadAt,
+    });
+  } catch (error) {
+    console.error(
+      `[markThreadAsRead] Error marking thread as read for userId=${req?.user?.sub}. Error:`,
+      error
+    );
+    return res.status(500).json({
+      message: "Failed to mark thread as read",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Toggle mute status for a thread
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ *
+ * URL parameters:
+ * - threadId (required): UUID of the thread
+ */
+export async function toggleThreadMute(req, res) {
+  try {
+    const userId = req.user.sub;
+    const { threadId } = req.params;
+
+    if (!threadId) {
+      return res.status(400).json({
+        message: "threadId is required",
+      });
+    }
+
+    // Verify user is a participant in this thread
+    const participant = await ChatThreadParticipant.findOne({
+      where: {
+        threadId,
+        userId,
+      },
+    });
+
+    if (!participant) {
+      return res.status(404).json({
+        message: "Thread not found or user is not a participant",
+      });
+    }
+
+    // Toggle mute status
+    const newMutedStatus = !participant.muted;
+    await participant.update({
+      muted: newMutedStatus,
+    });
+
+    return res.status(200).json({
+      message: `Thread ${newMutedStatus ? "muted" : "unmuted"}`,
+      muted: newMutedStatus,
+    });
+  } catch (error) {
+    console.error(
+      `[toggleThreadMute] Error toggling thread mute for userId=${req?.user?.sub}. Error:`,
+      error
+    );
+    return res.status(500).json({
+      message: "Failed to toggle thread mute",
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Toggle archive status for a thread
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ *
+ * URL parameters:
+ * - threadId (required): UUID of the thread
+ */
+export async function toggleThreadArchive(req, res) {
+  try {
+    const userId = req.user.sub;
+    const { threadId } = req.params;
+
+    if (!threadId) {
+      return res.status(400).json({
+        message: "threadId is required",
+      });
+    }
+
+    // Verify user is a participant in this thread
+    const participant = await ChatThreadParticipant.findOne({
+      where: {
+        threadId,
+        userId,
+      },
+    });
+
+    if (!participant) {
+      return res.status(404).json({
+        message: "Thread not found or user is not a participant",
+      });
+    }
+
+    // Toggle archive status
+    const newArchivedStatus = !participant.archived;
+    await participant.update({
+      archived: newArchivedStatus,
+    });
+
+    return res.status(200).json({
+      message: `Thread ${newArchivedStatus ? "archived" : "unarchived"}`,
+      archived: newArchivedStatus,
+    });
+  } catch (error) {
+    console.error(
+      `[toggleThreadArchive] Error toggling thread archive for userId=${req?.user?.sub}. Error:`,
+      error
+    );
+    return res.status(500).json({
+      message: "Failed to toggle thread archive",
       error: error.message,
     });
   }

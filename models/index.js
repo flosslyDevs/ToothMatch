@@ -28,6 +28,8 @@ import Rating from './shared/rating.js';
 import Blocklist from './profile/blocklist.js';
 import Report from './profile/report.js';
 import ChatMessage from './chat/message.js';
+import ChatThread from './chat/thread.js';
+import ChatThreadParticipant from './chat/threadParticipant.js';
 
 CandidateProfile.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(CandidateProfile, { foreignKey: 'userId' });
@@ -136,6 +138,16 @@ User.hasMany(ChatMessage, { foreignKey: 'senderId' });
 ChatMessage.belongsTo(User, { foreignKey: 'receiverId' });
 User.hasMany(ChatMessage, { foreignKey: 'receiverId' });
 
+// ChatThread associations
+ChatThread.hasMany(ChatMessage, { foreignKey: 'threadId' });
+ChatMessage.belongsTo(ChatThread, { foreignKey: 'threadId' });
+
+ChatThread.hasMany(ChatThreadParticipant, { foreignKey: 'threadId' });
+ChatThreadParticipant.belongsTo(ChatThread, { foreignKey: 'threadId' });
+
+ChatThreadParticipant.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(ChatThreadParticipant, { foreignKey: 'userId' });
+
 // FCM Token associations
 UserFCMToken.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(UserFCMToken, { foreignKey: 'userId' });
@@ -146,6 +158,8 @@ export {
 	Booking,
 	Event,
 	ChatMessage,
+	ChatThread,
+	ChatThreadParticipant,
 	CandidateProfile,
 	Education,
 	WorkExperience,
