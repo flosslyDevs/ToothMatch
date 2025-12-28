@@ -210,7 +210,7 @@ export async function getChats(req, res) {
   }
 
   try {
-    // Get all threads where user is a participant
+    // Optimized: Get all threads where user is a participant with latest messages in one query
     console.log(
       `[getChats] Fetching chat thread participants for userId=${userId}`
     );
@@ -219,14 +219,69 @@ export async function getChats(req, res) {
       include: [
         {
           model: ChatThread,
+          include: [
+            {
+              model: ChatMessage,
+              separate: true,
+              order: [["createdAt", "DESC"]],
+              limit: 1,
+              attributes: ["id", "senderId", "message", "createdAt"],
+            },
+            {
+              model: ChatThreadParticipant,
+              where: { userId: { [Op.ne]: userId } },
+              required: false,
+              include: [
+                {
+                  model: User,
+                  attributes: ["id", "fullName"],
+                  required: false,
+                },
+              ],
+            },
+          ],
         },
       ],
     });
+
     console.log(
       `[getChats] Found ${userParticipants.length} chat threads for userId=${userId}`
     );
 
-    // Get latest message and other participant for each thread
+    const otherUserIds = userParticipants
+      .map((p) => {
+        const otherParticipant = p.ChatThread?.ChatThreadParticipants?.[0];
+        return otherParticipant?.userId;
+      })
+      .filter(Boolean);
+
+    // Batch fetch all media for other users
+    const [profilePictures, practiceLogos] = await Promise.all([
+      Media.findAll({
+        where: {
+          userId: { [Op.in]: otherUserIds },
+          kind: "profile_picture",
+        },
+        attributes: ["userId", "url"],
+      }),
+      PracticeMedia.findAll({
+        where: {
+          userId: { [Op.in]: otherUserIds },
+          kind: "logo",
+        },
+        attributes: ["userId", "url"],
+      }),
+    ]);
+
+    // Create lookup maps for media
+    const profilePictureMap = new Map(
+      profilePictures.map((m) => [m.userId, m.url])
+    );
+    const practiceLogoMap = new Map(
+      practiceLogos.map((m) => [m.userId, m.url])
+    );
+
+    // Build response data
     const chatsData = [];
     for (const participant of userParticipants) {
       const thread = participant.ChatThread;
@@ -236,87 +291,48 @@ export async function getChats(req, res) {
         );
         continue;
       }
-      console.log(`[getChats] Processing threadId=${thread.id}`);
 
-      // Get the latest message for this thread
-      const latestMessage = await ChatMessage.findOne({
-        where: { threadId: thread.id },
-        order: [["createdAt", "DESC"]],
-      });
-      console.log(
-        `[getChats] Latest message for threadId=${thread.id}: ${
-          latestMessage ? latestMessage.id : "none"
-        }`
-      );
+      // Access latest message - Sequelize pluralizes model name for hasMany
+      const latestMessage = thread.ChatMessages?.[0] || null;
+      const otherParticipant = thread.ChatThreadParticipants?.[0];
 
-      // Get other participant (for direct chats)
-      const otherParticipant = await ChatThreadParticipant.findOne({
-        where: {
-          threadId: thread.id,
-          userId: { [Op.ne]: userId },
-        },
-        include: [
-          {
-            model: User,
-            attributes: ["id", "fullName"],
-            include: [
-              {
-                model: Media,
-                attributes: ["url"],
-                required: false,
-                where: {
-                  kind: "profile_picture",
-                },
-              },
-              {
-                model: PracticeMedia,
-                attributes: ["url"],
-                required: false,
-                where: {
-                  kind: "logo",
-                },
-              },
-            ],
-          },
-        ],
-      });
-
-      if (otherParticipant) {
-        console.log(
-          `[getChats] Found other participant for threadId=${thread.id}: userId=${otherParticipant.userId}`
-        );
-        let message = {
-          senderId: null,
-          message: "You started a new conversation",
-        };
-        if (latestMessage) {
-          message = {
-            senderId: latestMessage.senderId,
-            message: latestMessage.message,
-          };
-        }
-        const otherUserData = {
-          id: otherParticipant.userId,
-          name: otherParticipant.User?.fullName || null,
-          avatar:
-            otherParticipant.User?.Media?.[0]?.url ||
-            otherParticipant.PracticeMedia?.[0]?.url ||
-            null,
-        };
-        chatsData.push({
-          threadId: thread.id,
-          otherUser: otherUserData,
-          timestamp: latestMessage?.createdAt ?? thread.createdAt,
-          message,
-        });
-        console.log(
-          `[getChats] Added chat data for threadId=${thread.id} with otherUserId=${otherUserData.id}`
-        );
-      } else {
+      if (!otherParticipant) {
         console.warn(
           `[getChats] No other participant found for threadId=${thread.id}`
         );
+        continue;
       }
+
+      const otherUserId = otherParticipant.userId;
+      const otherUser = otherParticipant.User;
+
+      const otherUserData = {
+        id: otherUserId,
+        name: otherUser?.fullName || null,
+        avatar:
+          profilePictureMap.get(otherUserId) ||
+          practiceLogoMap.get(otherUserId) ||
+          null,
+      };
+
+      chatsData.push({
+        threadId: thread.id,
+        otherUser: otherUserData,
+        timestamp: latestMessage?.createdAt ?? thread.createdAt,
+        message: latestMessage
+          ? {
+              id: latestMessage.id,
+              senderId: latestMessage.senderId,
+              message: latestMessage.message,
+            }
+          : {
+              senderId: null,
+              message: "You started a new conversation",
+            },
+        lastReadAt: participant.lastReadAt,
+        muted: participant.muted,
+        archived: participant.archived,
+      });
     }
 
     console.log(
@@ -542,6 +558,7 @@ export async function sendMessage(req, res) {
       const messageData = {
         id: savedMessage.id,
         threadId: thread.id,
+        senderId: senderId,
         message: trimmedMessage,
         createdAt: savedMessage.createdAt,
       };
