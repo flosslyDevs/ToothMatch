@@ -110,6 +110,7 @@ export const sendChatNotification = async (
     type: "chat",
     messageId: String(messageData.id),
     threadId: String(messageData.threadId),
+    senderId: String(messageData.senderId),
     senderName: String(senderName || ""),
     message: String(messageData.message || ""),
     timestamp: new Date(messageData.createdAt).toISOString(),
