@@ -7,6 +7,7 @@ const PracticeProfile = sequelize?.define('PracticeProfile', {
 	// Step 1: About your business
 	clinicType: { type: DataTypes.STRING, allowNull: true },
 	// Step 2: Contact and brand info
+	about: { type: DataTypes.TEXT, allowNull: true },
 	website: { type: DataTypes.STRING, allowNull: true },
 	instagram: { type: DataTypes.STRING, allowNull: true },
 	facebook: { type: DataTypes.STRING, allowNull: true },

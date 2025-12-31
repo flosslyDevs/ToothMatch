@@ -395,8 +395,27 @@ export async function resetPassword(event) {
 	return { status: 200, body: { message: 'Password reset successfully' } };
 }
 export async function logout(event) {
-	// For JWT-based auth, logout is typically handled client-side by discarding the token
-	// This endpoint can be used for logging purposes or future token blacklisting
+	const { fcmToken, deviceId } = getBody(event);
+	const userId = event.user.sub;
+	if (!userId) {
+		console.error('[logout] User ID is required');
+	}
+	if (fcmToken) {
+		try {
+			const destroyed = await UserFCMToken.destroy({ where: { userId, fcmToken } });
+			console.log('[logout] FCM token destroyed:', destroyed);
+		} catch (error) {
+			console.error('[logout] Error destroying FCM token By FCMToken:', error);
+		}
+	}
+	else if (deviceId) {
+		try {
+			const destroyed = await UserFCMToken.destroy({ where: { userId, deviceId } });
+			console.log('[logout] Device FCM token destroyed:', destroyed);
+		} catch (error) {
+			console.error('[logout] Error destroying device FCM token By DeviceID:', error);
+		}
+	}
 	return { status: 200, body: { message: 'Logged out successfully' } };
 }
 

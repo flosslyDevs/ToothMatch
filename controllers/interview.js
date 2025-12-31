@@ -1,4 +1,4 @@
-import { Interview, User, PracticeProfile, CandidateProfile, PracticeMedia } from '../models/index.js';
+import { Interview, User, PracticeProfile, CandidateProfile, PracticeMedia, Media } from '../models/index.js';
 
 // Schedule an interview (Practice side)
 export async function scheduleInterview(req, res) {
@@ -120,10 +120,17 @@ export async function getCandidateInterviews(req, res) {
 				{
 					model: User,
 					as: 'Practice',
-					attributes: ['id', 'email'],
+					attributes: ['id', 'email', 'fullName'],
 					include: [{
 						model: PracticeProfile,
 						attributes: ['id', 'clinicType', 'phoneNumber']
+					}, {
+						model: PracticeMedia,
+						attributes: ['id', 'kind', 'url'],
+						required: false,
+						where: {
+							kind: 'logo',
+						},
 					}]
 				}
 			],
@@ -161,10 +168,20 @@ export async function getPracticeInterviews(req, res) {
 					model: User,
 					as: 'Candidate',
 					attributes: ['id', 'email'],
-					include: [{
+					include: [
+						{
 						model: CandidateProfile,
 						attributes: ['id', 'fullName', 'jobTitle']
-					}]
+						},
+						{
+							model: Media,
+							attributes: ['id', 'kind', 'url'],
+							required: false,
+							where: {
+								kind: 'profile_picture',
+							},
+						}
+					]
 				}
 			],
 			order: [['date', 'ASC'], ['time', 'ASC']] // Sort by date and time

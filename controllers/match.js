@@ -1,5 +1,17 @@
 import { Op } from 'sequelize';
-import { MatchLike, Match, LocumShift, PermanentJob, CandidateProfile, JobPreference, PracticeProfile, PracticeLocation, User } from '../models/index.js';
+import { 
+    MatchLike, 
+    Match, 
+    LocumShift, 
+    PermanentJob, 
+    CandidateProfile, 
+    JobPreference, 
+    PracticeProfile, 
+    PracticeLocation, 
+    User, 
+    Media,
+    PracticeMedia,
+} from '../models/index.js';
 
 function normalizeStr(s) { return (s || '').toString().trim().toLowerCase(); }
 
@@ -252,13 +264,26 @@ export async function getMatches(req, res) {
             } else if (m.targetType === 'permanent') {
                 target = await PermanentJob.findByPk(m.targetId);
             }
-            const candidate = await CandidateProfile.findOne({ where: { userId: m.candidateUserId } });
-            const practice = await PracticeProfile.findOne({ where: { userId: m.practiceUserId } });
+            const candidateProfile = await CandidateProfile.findOne({ where: { userId: m.candidateUserId } });
+            const candidateProfilePicture = await Media.findOne({ where: { userId: m.candidateUserId, kind: 'profile_picture' } });
+            const practiceProfile = await PracticeProfile.findOne({ where: { userId: m.practiceUserId } });
+            const practiceLogo = await PracticeMedia.findOne({ where: { userId: m.practiceUserId, kind: 'logo' } });
+            const practiceName = await User.findOne({ where: { userId: m.practiceUserId }, attributes: ['fullName'] });
+
+            const candidate = {
+                ...candidateProfile.toJSON(),
+                avatar: candidateProfilePicture ? candidateProfilePicture.url : null
+            };
+            const practice = {
+                ...practiceProfile.toJSON(),
+                avatar: practiceLogo ? practiceLogo.url : null,
+                name: practiceName ? practiceName.fullName : null
+            };
             return { 
                 ...m.toJSON(), 
                 target: target ? target.toJSON() : null, 
-                candidate: candidate ? candidate.toJSON() : null, 
-                practice: practice ? practice.toJSON() : null 
+                candidate,
+                practice
             };
         }));
 
