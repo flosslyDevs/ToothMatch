@@ -32,16 +32,6 @@ body:
         Response:
         {}
 
-  - type: dropdown
-    id: breaking
-    attributes:
-      label: Is this a breaking change?
-      options:
-        - No
-        - Yes
-    validations:
-      required: true
-
   - type: textarea
     id: notes
     attributes:
