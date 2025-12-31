@@ -12,7 +12,7 @@ body:
     id: endpoint
     attributes:
       label: Affected Endpoint
-      placeholder: "POST /api/v1/auth/login"
+      placeholder: "/api/v1/auth/login"
     validations:
       required: true
 
