@@ -1,0 +1,48 @@
+name: ✨ Feature Request
+description: Request a new API feature or enhancement
+title: "[FEATURE] "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      placeholder: "What problem does this solve?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      placeholder: "Describe the API behavior or feature"
+    validations:
+      required: true
+
+  - type: textarea
+    id: api_contract
+    attributes:
+      label: API Contract (if applicable)
+      placeholder: |
+        Endpoint: POST /api/v1/...
+        Auth: JWT
+        Request:
+        {}
+
+        Response:
+        {}
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Is this a breaking change?
+      options:
+        - No
+        - Yes
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Notes / Edge Cases

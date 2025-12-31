@@ -1,0 +1,83 @@
+name: 🐞 Bug Report
+description: Report a bug in the Express API
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please provide clear details so the issue can be reproduced and fixed quickly.
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: Affected Endpoint
+      placeholder: "POST /api/v1/auth/login"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: method
+    attributes:
+      label: HTTP Method
+      options:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: "Describe what should happen"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      placeholder: "Describe what actually happens"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Send request with payload...
+        2. Receive response...
+    validations:
+      required: true
+
+  - type: textarea
+    id: payload
+    attributes:
+      label: Request / Response Payload
+      placeholder: |
+        Request:
+        {
+          "email": "test@example.com"
+        }
+
+        Response:
+        {
+          "error": "Invalid token"
+        }
+
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: "local / staging / production"
+
+  - type: input
+    id: node
+    attributes:
+      label: Node.js Version
+      placeholder: "v20.x"

@@ -1,0 +1,27 @@
+name: 🧱 Task / Chore
+description: Non-feature backend work
+title: "[TASK] "
+labels: ["chore"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Task Description
+      placeholder: "Describe the task"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Code changes required
+        - label: Tests updated
+        - label: No API contract change
+        - label: Migration required
+
+  - type: input
+    id: related
+    attributes:
+      label: Related Issue / PR
