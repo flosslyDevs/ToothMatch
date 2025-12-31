@@ -17,7 +17,7 @@ export async function createPracticeProfile(req, res) {
 		clinicType,
 		media, // [{ kind: 'clinic_photo'|'team_photo'|'logo', url }]
 		// Step 2
-		website, instagram, facebook, linkedin, phoneNumber, hideFromPublic,
+		website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, about,
 		// Step 3
 		locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
 		// Step 4
@@ -45,6 +45,7 @@ export async function createPracticeProfile(req, res) {
 			linkedin, 
 			phoneNumber, 
 			hideFromPublic,
+			about,
 			profileCompletion: true
 		});
 
@@ -87,7 +88,7 @@ export async function upsertPracticeProfile(req, res) {
 		clinicType,
 		media, // [{ kind: 'clinic_photo'|'team_photo'|'logo', url }]
 		// Step 2
-		website, instagram, facebook, linkedin, phoneNumber, hideFromPublic,
+		website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, about,
 		// Step 3
 		locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
 		// Step 4
@@ -102,9 +103,9 @@ export async function upsertPracticeProfile(req, res) {
 		// Step 1 + 2: Basic practice profile & brand/contact
 		const [profile] = await PracticeProfile.findOrCreate({
 			where: { userId },
-			defaults: { userId, clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, profileCompletion: true }
+			defaults: { userId, clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, about, profileCompletion: true }
 		});
-		await profile.update({ clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, profileCompletion: true });
+		await profile.update({ clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, about, profileCompletion: true });
 
 		// Step 1: Media (replace all)
 		if (Array.isArray(media)) {
