@@ -363,8 +363,8 @@ export async function getMatches(req, res) {
             const candidateProfile = await CandidateProfile.findOne({ where: { userId: m.candidateUserId } });
             const candidateProfilePicture = await Media.findOne({ where: { userId: m.candidateUserId, kind: 'profile_picture' } });
             const practiceProfile = await PracticeProfile.findOne({ where: { userId: m.practiceUserId } });
-            const practiceLogo = await PracticeMedia.findOne({ where: { userId: m.practiceUserId, kind: 'logo' } });
-            const practiceName = await User.findOne({ where: { userId: m.practiceUserId }, attributes: ['fullName'] });
+            const practiceLogo = await Media.findOne({ where: { userId: m.practiceUserId, kind: 'logo' } });
+            const practiceName = await User.findOne({ where: { id: m.practiceUserId }, attributes: ['fullName'] });
 
             const candidate = {
                 ...candidateProfile.toJSON(),
