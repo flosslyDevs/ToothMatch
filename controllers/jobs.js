@@ -710,7 +710,13 @@ export async function filterCandidatesForPractices(req, res) {
                         },
                         {
                             model: Media,
-                            attributes: ['kind', 'url']
+                            attributes: ['kind', 'url'],
+                            required: false,
+                            separate: true,
+                            limit: 1,
+                            where: {
+                                kind: 'profile_picture'
+                            }
                         }
                     ]
                 }
