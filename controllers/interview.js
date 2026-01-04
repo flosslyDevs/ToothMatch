@@ -276,6 +276,24 @@ export async function getMyInterviews(req, res) {
           ['time', 'ASC'],
         ],
       });
+      // derive avatar from practice media if available
+      interviews = interviews.map((interview) => {
+        const interviewData = interview.toJSON();
+        const avatar = interviewData.Practice?.Media?.[0]?.url || null;
+
+        // Remove Media from Practice object
+        if (interviewData.Practice?.Media) {
+          const { Media: _ignoredMedia, ...practiceWithoutMedia } = interviewData.Practice;
+          interviewData.Practice = {
+            ...practiceWithoutMedia,
+            avatar,
+          };
+        } else if (interviewData.Practice) {
+          interviewData.Practice.avatar = avatar;
+        }
+
+        return interviewData;
+      });
     } else if (user.role === 'practice') {
       // Fetch all interviews scheduled by this practice
       interviews = await Interview.findAll({
@@ -293,6 +311,8 @@ export async function getMyInterviews(req, res) {
               {
                 model: Media,
                 attributes: ['id', 'kind', 'url'],
+                limit: 1,
+                separate: true,
                 required: false,
                 where: {
                   kind: 'profile_picture',
@@ -305,6 +325,24 @@ export async function getMyInterviews(req, res) {
           ['date', 'ASC'],
           ['time', 'ASC'],
         ],
+      });
+      // derive avatar from candidate media if available
+      interviews = interviews.map((interview) => {
+        const interviewData = interview.toJSON();
+        const avatar = interviewData.Candidate?.Media?.[0]?.url || null;
+
+        // Remove Media from Candidate object
+        if (interviewData.Candidate?.Media) {
+          const { Media: _ignoredMedia, ...candidateWithoutMedia } = interviewData.Candidate;
+          interviewData.Candidate = {
+            ...candidateWithoutMedia,
+            avatar,
+          };
+        } else if (interviewData.Candidate) {
+          interviewData.Candidate.avatar = avatar;
+        }
+
+        return interviewData;
       });
     } else {
       return res.status(403).json({ message: 'Invalid user role' });
