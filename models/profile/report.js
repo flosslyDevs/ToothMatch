@@ -1,8 +1,8 @@
-import { DataTypes } from "sequelize";
-import { sequelize } from "../../services/db.js";
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../../services/db.js';
 
 const Report = sequelize?.define(
-  "Report",
+  'Report',
   {
     id: {
       type: DataTypes.UUID,
@@ -13,15 +13,15 @@ const Report = sequelize?.define(
     reportedByUserId: { type: DataTypes.UUID, allowNull: false },
     reason: { type: DataTypes.TEXT, allowNull: false },
     status: {
-      type: DataTypes.ENUM("pending", "accepted", "rejected"),
+      type: DataTypes.ENUM('pending', 'accepted', 'rejected'),
       allowNull: false,
-      defaultValue: "pending",
+      defaultValue: 'pending',
     },
     resolvedAt: { type: DataTypes.DATE, allowNull: true },
     resolvedBy: { type: DataTypes.UUID, allowNull: true },
     resolvedReason: { type: DataTypes.TEXT, allowNull: true },
   },
-  { tableName: "reports", underscored: true }
+  { tableName: 'reports', underscored: true }
 );
 
 export default Report;

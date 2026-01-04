@@ -1,8 +1,8 @@
-import { DataTypes } from "sequelize";
-import { sequelize } from "../../services/db.js";
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../../services/db.js';
 
 const ChatThreadParticipant = sequelize.define(
-  "ChatThreadParticipant",
+  'ChatThreadParticipant',
   {
     id: {
       type: DataTypes.UUID,
@@ -22,12 +22,12 @@ const ChatThreadParticipant = sequelize.define(
     updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },
   {
-    tableName: "chat_thread_participants",
+    tableName: 'chat_thread_participants',
     underscored: true,
     indexes: [
-      { fields: ["thread_id"] },
-      { fields: ["user_id"] },
-      { unique: true, fields: ["thread_id", "user_id"] },
+      { fields: ['thread_id'] },
+      { fields: ['user_id'] },
+      { unique: true, fields: ['thread_id', 'user_id'] },
     ],
   }
 );

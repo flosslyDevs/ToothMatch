@@ -8,9 +8,9 @@ import {
   Media,
   PracticeMedia,
   MatchLike,
-} from "../models/index.js";
-import { Op } from "sequelize";
-import { sendChatNotification } from "../utils/fcm.js";
+} from '../models/index.js';
+import { Op } from 'sequelize';
+import { sendChatNotification } from '../utils/fcm.js';
 
 /**
  * Get chat history between the authenticated user and a recipient
@@ -55,7 +55,7 @@ export async function getChatHistory(req, res) {
 
       if (!userParticipant) {
         return res.status(403).json({
-          message: "Thread not found or user is not a participant",
+          message: 'Thread not found or user is not a participant',
         });
       }
 
@@ -67,7 +67,7 @@ export async function getChatHistory(req, res) {
           `[getChatHistory] Missing both threadId and receiverId param from userId: ${userId}`
         );
         return res.status(400).json({
-          message: "Either threadId or receiverId is required",
+          message: 'Either threadId or receiverId is required',
         });
       }
 
@@ -78,7 +78,7 @@ export async function getChatHistory(req, res) {
         include: [
           {
             model: ChatThread,
-            where: { type: "direct" },
+            where: { type: 'direct' },
             include: [
               {
                 model: ChatThreadParticipant,
@@ -123,7 +123,7 @@ export async function getChatHistory(req, res) {
           `[getChatHistory] Cursor message not found or does not belong to this thread. userId=${userId}, threadId=${resolvedThreadId}, beforeMessageId=${beforeMessageId}`
         );
         return res.status(404).json({
-          message: "Message not found or does not belong to this conversation",
+          message: 'Message not found or does not belong to this conversation',
         });
       }
 
@@ -140,9 +140,9 @@ export async function getChatHistory(req, res) {
     // When loading older messages, we want messages before the cursor
     const messages = await ChatMessage.findAll({
       where: whereClause,
-      order: [["createdAt", "DESC"]],
+      order: [['createdAt', 'DESC']],
       limit: messageLimit,
-      attributes: ["id", "senderId", "message", "createdAt"],
+      attributes: ['id', 'senderId', 'message', 'createdAt'],
     });
 
     console.log(
@@ -187,7 +187,7 @@ export async function getChatHistory(req, res) {
       error
     );
     return res.status(500).json({
-      message: "Error fetching chat history",
+      message: 'Error fetching chat history',
       error: error.message,
     });
   }
@@ -207,7 +207,7 @@ export async function getChats(req, res) {
 
   if (!userId) {
     console.warn(`[getChats] No userId found in request`);
-    return res.status(401).json({ message: "User not authenticated" });
+    return res.status(401).json({ message: 'User not authenticated' });
   }
 
   try {
@@ -224,9 +224,9 @@ export async function getChats(req, res) {
             {
               model: ChatMessage,
               separate: true,
-              order: [["createdAt", "DESC"]],
+              order: [['createdAt', 'DESC']],
               limit: 1,
-              attributes: ["id", "senderId", "message", "createdAt"],
+              attributes: ['id', 'senderId', 'message', 'createdAt'],
             },
             {
               model: ChatThreadParticipant,
@@ -235,7 +235,7 @@ export async function getChats(req, res) {
               include: [
                 {
                   model: User,
-                  attributes: ["id", "fullName"],
+                  attributes: ['id', 'fullName'],
                   required: false,
                 },
               ],
@@ -261,16 +261,16 @@ export async function getChats(req, res) {
       Media.findAll({
         where: {
           userId: { [Op.in]: otherUserIds },
-          kind: "profile_picture",
+          kind: 'profile_picture',
         },
-        attributes: ["userId", "url"],
+        attributes: ['userId', 'url'],
       }),
       PracticeMedia.findAll({
         where: {
           userId: { [Op.in]: otherUserIds },
-          kind: "logo",
+          kind: 'logo',
         },
-        attributes: ["userId", "url"],
+        attributes: ['userId', 'url'],
       }),
     ]);
 
@@ -328,7 +328,7 @@ export async function getChats(req, res) {
             }
           : {
               senderId: null,
-              message: "You started a new conversation",
+              message: 'You started a new conversation',
             },
         lastReadAt: participant.lastReadAt,
         muted: participant.muted,
@@ -345,10 +345,10 @@ export async function getChats(req, res) {
       ),
     });
   } catch (error) {
-    console.error("Error fetching chats:", error);
+    console.error('Error fetching chats:', error);
     return res
       .status(500)
-      .json({ message: error.message || "Internal server error" });
+      .json({ message: error.message || 'Internal server error' });
   }
 }
 
@@ -377,16 +377,16 @@ export async function sendMessage(req, res) {
     // Validate required fields
     if (!message || !receiverId) {
       return res.status(400).json({
-        message: "Invalid message or receiver ID",
-        code: "MISSING_FIELDS",
+        message: 'Invalid message or receiver ID',
+        code: 'MISSING_FIELDS',
       });
     }
 
     // Validate sender is authenticated
     if (!senderId) {
       return res.status(401).json({
-        message: "Not authenticated",
-        code: "NOT_AUTHENTICATED",
+        message: 'Not authenticated',
+        code: 'NOT_AUTHENTICATED',
       });
     }
 
@@ -394,8 +394,8 @@ export async function sendMessage(req, res) {
     const receiver = await User.findByPk(receiverId);
     if (!receiver) {
       return res.status(404).json({
-        message: "Receiver not found",
-        code: "RECEIVER_NOT_FOUND",
+        message: 'Receiver not found',
+        code: 'RECEIVER_NOT_FOUND',
       });
     }
 
@@ -406,18 +406,18 @@ export async function sendMessage(req, res) {
       trimmedMessage.length > 0 && !isMessageToSelf && message.length < 1000;
 
     if (!isMessageValid) {
-      let reason = "Invalid message";
+      let reason = 'Invalid message';
       if (isMessageToSelf) {
-        reason = "Cannot send message to self";
+        reason = 'Cannot send message to self';
       } else if (trimmedMessage.length === 0) {
-        reason = "Message cannot be empty";
+        reason = 'Message cannot be empty';
       } else if (message.length >= 1000) {
-        reason = "Message too long (max 1000 characters)";
+        reason = 'Message too long (max 1000 characters)';
       }
 
       return res.status(400).json({
         message: reason,
-        code: "INVALID_MESSAGE",
+        code: 'INVALID_MESSAGE',
       });
     }
 
@@ -440,10 +440,10 @@ export async function sendMessage(req, res) {
           {
             [Op.or]: [
               {
-                status: "confirmed",
+                status: 'confirmed',
               },
               {
-                status: "completed",
+                status: 'completed',
               },
             ],
           },
@@ -474,8 +474,8 @@ export async function sendMessage(req, res) {
     if (!isPermitted) {
       return res.status(403).json({
         message:
-          "No permission to send message. You must either have a confirmed or completed interview with this user, or have liked each other.",
-        code: "NO_PERMISSION",
+          'No permission to send message. You must either have a confirmed or completed interview with this user, or have liked each other.',
+        code: 'NO_PERMISSION',
       });
     }
 
@@ -484,23 +484,23 @@ export async function sendMessage(req, res) {
       include: [
         {
           model: Media,
-          attributes: ["url"],
+          attributes: ['url'],
           required: false,
           where: {
-            kind: "profile_picture",
+            kind: 'profile_picture',
           },
         },
         {
           model: PracticeMedia,
-          attributes: ["url"],
+          attributes: ['url'],
           required: false,
           where: {
-            kind: "logo",
+            kind: 'logo',
           },
         },
       ],
     });
-    const senderName = sender?.fullName || "Someone";
+    const senderName = sender?.fullName || 'Someone';
     const senderAvatar =
       sender?.Media?.[0]?.url || sender?.PracticeMedia?.[0]?.url || null;
 
@@ -511,7 +511,7 @@ export async function sendMessage(req, res) {
       include: [
         {
           model: ChatThread,
-          where: { type: "direct" },
+          where: { type: 'direct' },
           include: [
             {
               model: ChatThreadParticipant,
@@ -528,7 +528,7 @@ export async function sendMessage(req, res) {
     // If thread doesn't exist, create it
     if (!thread) {
       thread = await ChatThread.create({
-        type: "direct",
+        type: 'direct',
       });
 
       // Create participants for both users
@@ -596,7 +596,7 @@ export async function sendMessage(req, res) {
       const invalidTokenIds = [];
       const validTokenIds = [];
       results.forEach((result, index) => {
-        if (result.status === "fulfilled") {
+        if (result.status === 'fulfilled') {
           if (result.value.success) {
             fcmResults.successful++;
             // Track valid tokens to update lastUsedAt
@@ -604,7 +604,7 @@ export async function sendMessage(req, res) {
           } else {
             fcmResults.failed++;
             // If token is invalid, mark for deletion
-            if (result.value.error === "INVALID_TOKEN") {
+            if (result.value.error === 'INVALID_TOKEN') {
               invalidTokenIds.push(receiverTokens[index].id);
             }
           }
@@ -655,8 +655,8 @@ export async function sendMessage(req, res) {
       error
     );
     return res.status(500).json({
-      message: "Failed to send message",
-      code: "SERVER_ERROR",
+      message: 'Failed to send message',
+      code: 'SERVER_ERROR',
       error: error.message,
     });
   }
@@ -678,7 +678,7 @@ export async function markThreadAsRead(req, res) {
 
     if (!threadId) {
       return res.status(400).json({
-        message: "threadId is required",
+        message: 'threadId is required',
       });
     }
 
@@ -692,7 +692,7 @@ export async function markThreadAsRead(req, res) {
 
     if (!participant) {
       return res.status(404).json({
-        message: "Thread not found or user is not a participant",
+        message: 'Thread not found or user is not a participant',
       });
     }
 
@@ -702,7 +702,7 @@ export async function markThreadAsRead(req, res) {
     });
 
     return res.status(200).json({
-      message: "Thread marked as read",
+      message: 'Thread marked as read',
       lastReadAt: participant.lastReadAt,
     });
   } catch (error) {
@@ -711,7 +711,7 @@ export async function markThreadAsRead(req, res) {
       error
     );
     return res.status(500).json({
-      message: "Failed to mark thread as read",
+      message: 'Failed to mark thread as read',
       error: error.message,
     });
   }
@@ -733,7 +733,7 @@ export async function toggleThreadMute(req, res) {
 
     if (!threadId) {
       return res.status(400).json({
-        message: "threadId is required",
+        message: 'threadId is required',
       });
     }
 
@@ -747,7 +747,7 @@ export async function toggleThreadMute(req, res) {
 
     if (!participant) {
       return res.status(404).json({
-        message: "Thread not found or user is not a participant",
+        message: 'Thread not found or user is not a participant',
       });
     }
 
@@ -758,7 +758,7 @@ export async function toggleThreadMute(req, res) {
     });
 
     return res.status(200).json({
-      message: `Thread ${newMutedStatus ? "muted" : "unmuted"}`,
+      message: `Thread ${newMutedStatus ? 'muted' : 'unmuted'}`,
       muted: newMutedStatus,
     });
   } catch (error) {
@@ -767,7 +767,7 @@ export async function toggleThreadMute(req, res) {
       error
     );
     return res.status(500).json({
-      message: "Failed to toggle thread mute",
+      message: 'Failed to toggle thread mute',
       error: error.message,
     });
   }
@@ -789,7 +789,7 @@ export async function toggleThreadArchive(req, res) {
 
     if (!threadId) {
       return res.status(400).json({
-        message: "threadId is required",
+        message: 'threadId is required',
       });
     }
 
@@ -803,7 +803,7 @@ export async function toggleThreadArchive(req, res) {
 
     if (!participant) {
       return res.status(404).json({
-        message: "Thread not found or user is not a participant",
+        message: 'Thread not found or user is not a participant',
       });
     }
 
@@ -814,7 +814,7 @@ export async function toggleThreadArchive(req, res) {
     });
 
     return res.status(200).json({
-      message: `Thread ${newArchivedStatus ? "archived" : "unarchived"}`,
+      message: `Thread ${newArchivedStatus ? 'archived' : 'unarchived'}`,
       archived: newArchivedStatus,
     });
   } catch (error) {
@@ -823,7 +823,7 @@ export async function toggleThreadArchive(req, res) {
       error
     );
     return res.status(500).json({
-      message: "Failed to toggle thread archive",
+      message: 'Failed to toggle thread archive',
       error: error.message,
     });
   }

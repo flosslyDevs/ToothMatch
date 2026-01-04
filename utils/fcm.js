@@ -1,13 +1,13 @@
-import admin from "firebase-admin";
-import fs from "fs";
-import UserFCMToken from "../models/auth/userFCMToken.js";
+import admin from 'firebase-admin';
+import fs from 'fs';
+import UserFCMToken from '../models/auth/userFCMToken.js';
 
 // Initialize Firebase Admin if not already initialized
 let fcmInitialized = false;
 
 const notificationTypes = {
-  chat: "chat",
-  like: "like",
+  chat: 'chat',
+  like: 'like',
 };
 
 export const initializeFCM = () => {
@@ -19,21 +19,21 @@ export const initializeFCM = () => {
   if (admin.apps.length === 0) {
     if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON_PATH) {
       const serviceAccount = JSON.parse(
-        fs.readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_JSON_PATH, "utf8")
+        fs.readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_JSON_PATH, 'utf8')
       );
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
     } else {
       console.warn(
-        "FCM not initialized: Missing FIREBASE_SERVICE_ACCOUNT_JSON_PATH"
+        'FCM not initialized: Missing FIREBASE_SERVICE_ACCOUNT_JSON_PATH'
       );
       return false;
     }
   }
 
   fcmInitialized = true;
-  console.log("FCM initialized successfully");
+  console.log('FCM initialized successfully');
   return true;
 };
 
@@ -54,46 +54,46 @@ export const sendFCMNotification = async (
   }
 
   if (!fcmToken) {
-    throw new Error("FCM token is required");
+    throw new Error('FCM token is required');
   }
 
   if (!admin.apps.length) {
-    throw new Error("Firebase Admin not initialized");
+    throw new Error('Firebase Admin not initialized');
   }
 
   const message = {
     token: fcmToken,
     notification: {
-      title: notification.title || "New Message",
-      body: notification.body || "",
+      title: notification.title || 'New Message',
+      body: notification.body || '',
     },
     data,
     android: {
-      priority: "high",
+      priority: 'high',
     },
     apns: {
       headers: {
-        "apns-priority": "10",
+        'apns-priority': '10',
       },
     },
   };
 
   try {
     const response = await admin.messaging().send(message);
-    console.log("Successfully sent FCM message:", response);
+    console.log('Successfully sent FCM message:', response);
     return { success: true, messageId: response };
   } catch (error) {
-    console.error("Error sending FCM message:", error);
+    console.error('Error sending FCM message:', error);
 
     // Handle invalid token errors
     if (
-      error.code === "messaging/invalid-registration-token" ||
-      error.code === "messaging/registration-token-not-registered"
+      error.code === 'messaging/invalid-registration-token' ||
+      error.code === 'messaging/registration-token-not-registered'
     ) {
-      return { success: false, error: "INVALID_TOKEN", message: error.message };
+      return { success: false, error: 'INVALID_TOKEN', message: error.message };
     }
 
-    return { success: false, error: "FCM_ERROR", message: error.message };
+    return { success: false, error: 'FCM_ERROR', message: error.message };
   }
 };
 
@@ -117,16 +117,16 @@ export const sendChatNotification = async (
     messageId: String(messageData.id),
     threadId: String(messageData.threadId),
     senderId: String(messageData.senderId),
-    senderName: String(senderName || ""),
-    message: String(messageData.message || ""),
+    senderName: String(senderName || ''),
+    message: String(messageData.message || ''),
     timestamp: new Date(messageData.createdAt).toISOString(),
   };
 
   return sendFCMNotification(
     fcmToken,
     {
-      title: data.senderName || "New Message",
-      body: data.message || "",
+      title: data.senderName || 'New Message',
+      body: data.message || '',
       imageUrl: senderAvatar,
     },
     data
@@ -155,7 +155,7 @@ export const sendLikeNotification = async (
   return sendFCMNotification(
     fcmToken,
     {
-      title: "New Like",
+      title: 'New Like',
       body: `${senderName} liked your profile!`,
       imageUrl: senderAvatar,
     },
@@ -173,7 +173,7 @@ export const getFCMTokensForUser = async (userId) => {
     const tokens = await UserFCMToken.findAll({ where: { userId } });
     return tokens.map((token) => token.fcmToken);
   } catch (error) {
-    console.error("Error getting FCM tokens for user:", error);
+    console.error('Error getting FCM tokens for user:', error);
     throw error;
   }
 };

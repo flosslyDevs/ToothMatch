@@ -1,264 +1,338 @@
-import { 
-	User,
-	PracticeProfile,
-	PracticeMedia,
-	PracticeLocation,
-	PracticeCompliance,
-	PracticePayment,
-	PracticeCulture,
-	Rating,
+import {
+  User,
+  PracticeProfile,
+  PracticeMedia,
+  PracticeLocation,
+  PracticeCompliance,
+  PracticePayment,
+  PracticeCulture,
+  Rating,
 } from '../models/index.js';
 
 // Create a new practice profile
 export async function createPracticeProfile(req, res) {
-	const userId = req.user.sub;
-	const {
-		// Step 1
-		clinicType,
-		media, // [{ kind: 'clinic_photo'|'team_photo'|'logo', url }]
-		// Step 2
-		website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, about,
-		// Step 3
-		locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
-		// Step 4
-		compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
-		// Step 5
-		// payment, // { stripeAccountId, bankAccountDetails, invoiceEmail, billingAddress, defaultLocationRatesPerRole, cancellationPolicy }
-		// Step 6
-		// culture, // { clinicCultureDescriptors, benefitsOffered, workloadStyle }
-	} = req.body || {};
+  const userId = req.user.sub;
+  const {
+    // Step 1
+    clinicType,
+    media, // [{ kind: 'clinic_photo'|'team_photo'|'logo', url }]
+    // Step 2
+    website,
+    instagram,
+    facebook,
+    linkedin,
+    phoneNumber,
+    hideFromPublic,
+    about,
+    // Step 3
+    locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
+    // Step 4
+    compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
+    // Step 5
+    // payment, // { stripeAccountId, bankAccountDetails, invoiceEmail, billingAddress, defaultLocationRatesPerRole, cancellationPolicy }
+    // Step 6
+    // culture, // { clinicCultureDescriptors, benefitsOffered, workloadStyle }
+  } = req.body || {};
 
-	try {
-		// Check if user already has a practice profile
-		const existingProfile = await PracticeProfile.findOne({ where: { userId } });
-		if (existingProfile) {
-			return res.status(400).json({ message: 'Practice profile already exists for this user. Use PUT to update.' });
-		}
+  try {
+    // Check if user already has a practice profile
+    const existingProfile = await PracticeProfile.findOne({
+      where: { userId },
+    });
+    if (existingProfile) {
+      return res
+        .status(400)
+        .json({
+          message:
+            'Practice profile already exists for this user. Use PUT to update.',
+        });
+    }
 
-		// Step 1 + 2: Create basic practice profile & brand/contact
-		const profile = await PracticeProfile.create({ 
-			userId, 
-			clinicType, 
-			website, 
-			instagram, 
-			facebook, 
-			linkedin, 
-			phoneNumber, 
-			hideFromPublic,
-			about,
-			profileCompletion: true
-		});
+    // Step 1 + 2: Create basic practice profile & brand/contact
+    const profile = await PracticeProfile.create({
+      userId,
+      clinicType,
+      website,
+      instagram,
+      facebook,
+      linkedin,
+      phoneNumber,
+      hideFromPublic,
+      about,
+      profileCompletion: true,
+    });
 
-		// Step 1: Media (create all)
-		if (Array.isArray(media)) {
-			await Promise.all(media.map(m => PracticeMedia.create({ ...m, userId })));
-		}
+    // Step 1: Media (create all)
+    if (Array.isArray(media)) {
+      await Promise.all(
+        media.map((m) => PracticeMedia.create({ ...m, userId }))
+      );
+    }
 
-		// Step 3: Locations (create all)
-		if (Array.isArray(locations)) {
-			await Promise.all(locations.map(loc => PracticeLocation.create({ ...loc, userId })));
-		}
+    // Step 3: Locations (create all)
+    if (Array.isArray(locations)) {
+      await Promise.all(
+        locations.map((loc) => PracticeLocation.create({ ...loc, userId }))
+      );
+    }
 
-		// Step 4: Compliance (create single row)
-		// if (compliance) {
-		// 	await PracticeCompliance.create({ ...compliance, userId });
-		// }
+    // Step 4: Compliance (create single row)
+    // if (compliance) {
+    // 	await PracticeCompliance.create({ ...compliance, userId });
+    // }
 
-		// Step 5: Payment (create single row)
-		// if (payment) {
-		// 	await PracticePayment.create({ ...payment, userId });
-		// }
+    // Step 5: Payment (create single row)
+    // if (payment) {
+    // 	await PracticePayment.create({ ...payment, userId });
+    // }
 
-		// Step 6: Culture (create single row)
-		// if (culture) {
-		// 	await PracticeCulture.create({ ...culture, userId });
-		// }
+    // Step 6: Culture (create single row)
+    // if (culture) {
+    // 	await PracticeCulture.create({ ...culture, userId });
+    // }
 
-		return res.status(201).json({ message: 'Practice profile created successfully', profileId: profile.id, profileCompletion: true });
-	} catch (error) {
-		return res.status(500).json({ message: error.message });
-	}
+    return res
+      .status(201)
+      .json({
+        message: 'Practice profile created successfully',
+        profileId: profile.id,
+        profileCompletion: true,
+      });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 }
 
 // Upsert all practice data in a single payload
 export async function upsertPracticeProfile(req, res) {
-	const userId = req.user.sub;
-	const {
-		// Step 1
-		clinicType,
-		media, // [{ kind: 'clinic_photo'|'team_photo'|'logo', url }]
-		// Step 2
-		website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, about,
-		// Step 3
-		locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
-		// Step 4
-		compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
-		// Step 5
-		// payment, // { stripeAccountId, bankAccountDetails, invoiceEmail, billingAddress, defaultLocationRatesPerRole, cancellationPolicy }
-		// Step 6
-		// culture, // { clinicCultureDescriptors, benefitsOffered, workloadStyle }
-	} = req.body || {};
+  const userId = req.user.sub;
+  const {
+    // Step 1
+    clinicType,
+    media, // [{ kind: 'clinic_photo'|'team_photo'|'logo', url }]
+    // Step 2
+    website,
+    instagram,
+    facebook,
+    linkedin,
+    phoneNumber,
+    hideFromPublic,
+    about,
+    // Step 3
+    locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
+    // Step 4
+    compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
+    // Step 5
+    // payment, // { stripeAccountId, bankAccountDetails, invoiceEmail, billingAddress, defaultLocationRatesPerRole, cancellationPolicy }
+    // Step 6
+    // culture, // { clinicCultureDescriptors, benefitsOffered, workloadStyle }
+  } = req.body || {};
 
-	try {
-		// Step 1 + 2: Basic practice profile & brand/contact
-		const [profile] = await PracticeProfile.findOrCreate({
-			where: { userId },
-			defaults: { userId, clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, about, profileCompletion: true }
-		});
-		await profile.update({ clinicType, website, instagram, facebook, linkedin, phoneNumber, hideFromPublic, about, profileCompletion: true });
+  try {
+    // Step 1 + 2: Basic practice profile & brand/contact
+    const [profile] = await PracticeProfile.findOrCreate({
+      where: { userId },
+      defaults: {
+        userId,
+        clinicType,
+        website,
+        instagram,
+        facebook,
+        linkedin,
+        phoneNumber,
+        hideFromPublic,
+        about,
+        profileCompletion: true,
+      },
+    });
+    await profile.update({
+      clinicType,
+      website,
+      instagram,
+      facebook,
+      linkedin,
+      phoneNumber,
+      hideFromPublic,
+      about,
+      profileCompletion: true,
+    });
 
-		// Step 1: Media (replace all)
-		if (Array.isArray(media)) {
-			await PracticeMedia.destroy({ where: { userId } });
-			await Promise.all(media.map(m => PracticeMedia.create({ ...m, userId })));
-		}
+    // Step 1: Media (replace all)
+    if (Array.isArray(media)) {
+      await PracticeMedia.destroy({ where: { userId } });
+      await Promise.all(
+        media.map((m) => PracticeMedia.create({ ...m, userId }))
+      );
+    }
 
-		// Step 3: Locations (replace all)
-		if (Array.isArray(locations)) {
-			await PracticeLocation.destroy({ where: { userId } });
-			await Promise.all(locations.map(loc => PracticeLocation.create({ ...loc, userId })));
-		}
+    // Step 3: Locations (replace all)
+    if (Array.isArray(locations)) {
+      await PracticeLocation.destroy({ where: { userId } });
+      await Promise.all(
+        locations.map((loc) => PracticeLocation.create({ ...loc, userId }))
+      );
+    }
 
-		// Step 4: Compliance (single row upsert)
-		// if (compliance) {
-		// 	const [comp] = await PracticeCompliance.findOrCreate({ where: { userId }, defaults: { ...compliance, userId } });
-		// 	await comp.update(compliance);
-		// }
+    // Step 4: Compliance (single row upsert)
+    // if (compliance) {
+    // 	const [comp] = await PracticeCompliance.findOrCreate({ where: { userId }, defaults: { ...compliance, userId } });
+    // 	await comp.update(compliance);
+    // }
 
-		// Step 5: Payment (single row upsert)
-		// if (payment) {
-		// 	const [pay] = await PracticePayment.findOrCreate({ where: { userId }, defaults: { ...payment, userId } });
-		// 	await pay.update(payment);
-		// }
+    // Step 5: Payment (single row upsert)
+    // if (payment) {
+    // 	const [pay] = await PracticePayment.findOrCreate({ where: { userId }, defaults: { ...payment, userId } });
+    // 	await pay.update(payment);
+    // }
 
-		// Step 6: Culture (single row upsert)
-		// if (culture) {
-		// 	const [cul] = await PracticeCulture.findOrCreate({ where: { userId }, defaults: { ...culture, userId } });
-		// 	await cul.update(culture);
-		// }
+    // Step 6: Culture (single row upsert)
+    // if (culture) {
+    // 	const [cul] = await PracticeCulture.findOrCreate({ where: { userId }, defaults: { ...culture, userId } });
+    // 	await cul.update(culture);
+    // }
 
-		return res.status(200).json({ message: 'Practice profile saved', profileCompletion: true });
-	} catch (error) {
-		return res.status(500).json({ message: error.message });
-	}
+    return res
+      .status(200)
+      .json({ message: 'Practice profile saved', profileCompletion: true });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 }
 
 export async function getPracticeProfile(req, res) {
-	const userId = req.user.sub;
-	try {
-		const profile = await PracticeProfile.findOne({ where: { userId } });
-		const media = await PracticeMedia.findAll({ where: { userId } });
-		const locations = await PracticeLocation.findAll({ where: { userId } });
-		const ratings = await Rating.findAll({ where: { profileId: profile.id, type: 'practice' } });
-		// const compliance = await PracticeCompliance.findOne({ where: { userId } });
-		// const payment = await PracticePayment.findOne({ where: { userId } });
-		// const culture = await PracticeCulture.findOne({ where: { userId } });
-		return res.status(200).json({ profile, media, locations, ratings });
-	} catch (error) {
-		return res.status(500).json({ message: error.message });
-	}
+  const userId = req.user.sub;
+  try {
+    const profile = await PracticeProfile.findOne({ where: { userId } });
+    const media = await PracticeMedia.findAll({ where: { userId } });
+    const locations = await PracticeLocation.findAll({ where: { userId } });
+    const ratings = await Rating.findAll({
+      where: { profileId: profile.id, type: 'practice' },
+    });
+    // const compliance = await PracticeCompliance.findOne({ where: { userId } });
+    // const payment = await PracticePayment.findOne({ where: { userId } });
+    // const culture = await PracticeCulture.findOne({ where: { userId } });
+    return res.status(200).json({ profile, media, locations, ratings });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 }
 
 // Get all practice profiles for a specific user
 export async function getAllUserProfiles(req, res) {
-	const { userId } = req.params;
-	try {
-		const profiles = await PracticeProfile.findAll({ 
-			where: { userId },
-			include: [
-				{
-					model: PracticeMedia
-				},
-				{
-					model: PracticeLocation
-				},
-				// {
-				// 	model: PracticeCompliance
-				// }
-			]
-		});
-		return res.status(200).json({ profiles });
-	} catch (error) {
-		return res.status(500).json({ message: error.message });
-	}
+  const { userId } = req.params;
+  try {
+    const profiles = await PracticeProfile.findAll({
+      where: { userId },
+      include: [
+        {
+          model: PracticeMedia,
+        },
+        {
+          model: PracticeLocation,
+        },
+        // {
+        // 	model: PracticeCompliance
+        // }
+      ],
+    });
+    return res.status(200).json({ profiles });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 }
 
 // Get a specific practice profile by ID (Public - for candidates to view practices)
 export async function getSpecificPractice(req, res) {
-	const { practiceId } = req.params;
-	try {
-		// Try to find by practice profile id first
-		let profile = await PracticeProfile.findByPk(practiceId, {
-			include: [
-				{
-					model: PracticeMedia
-				},
-				{
-					model: PracticeLocation
-				},
-				// {
-				// 	model: PracticeCompliance
-				// }
-			]
-		});
-		
-		// If not found by profile ID, try by userId
-		if (!profile) {
-			profile = await PracticeProfile.findOne({
-				where: { userId: practiceId },
-				include: [
-					{
-						model: PracticeMedia
-					},
-					{
-						model: PracticeLocation
-					}
-				]
-			});
-		}
-		
-		if (!profile) {
-			return res.status(404).json({ message: 'Practice profile not found' });
-		}
-		
-		// Extract logo from media (prefer kind='logo', else first item)
-		const practiceMedia = profile.PracticeMedia || [];
-		let logo = null;
-		if (practiceMedia.length > 0) {
-			const logoMedia = practiceMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
-			logo = logoMedia ? logoMedia.url : (practiceMedia[0] ? practiceMedia[0].url : null);
-		}
-		
-		// Add logo to profile object
-		const profileWithLogo = {
-			...profile.toJSON(),
-			logo
-		};
-		
-		return res.status(200).json({ 
-			profile: profileWithLogo,
-			media: practiceMedia,
-			locations: profile.PracticeLocation || []
-		});
-	} catch (error) {
-		return res.status(500).json({ message: error.message });
-	}
+  const { practiceId } = req.params;
+  try {
+    // Try to find by practice profile id first
+    let profile = await PracticeProfile.findByPk(practiceId, {
+      include: [
+        {
+          model: PracticeMedia,
+        },
+        {
+          model: PracticeLocation,
+        },
+        // {
+        // 	model: PracticeCompliance
+        // }
+      ],
+    });
+
+    // If not found by profile ID, try by userId
+    if (!profile) {
+      profile = await PracticeProfile.findOne({
+        where: { userId: practiceId },
+        include: [
+          {
+            model: PracticeMedia,
+          },
+          {
+            model: PracticeLocation,
+          },
+        ],
+      });
+    }
+
+    if (!profile) {
+      return res.status(404).json({ message: 'Practice profile not found' });
+    }
+
+    // Extract logo from media (prefer kind='logo', else first item)
+    const practiceMedia = profile.PracticeMedia || [];
+    let logo = null;
+    if (practiceMedia.length > 0) {
+      const logoMedia = practiceMedia.find(
+        (m) => (m.kind || '').toLowerCase() === 'logo'
+      );
+      logo = logoMedia
+        ? logoMedia.url
+        : practiceMedia[0]
+          ? practiceMedia[0].url
+          : null;
+    }
+
+    // Add logo to profile object
+    const profileWithLogo = {
+      ...profile.toJSON(),
+      logo,
+    };
+
+    return res.status(200).json({
+      profile: profileWithLogo,
+      media: practiceMedia,
+      locations: profile.PracticeLocation || [],
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 }
 
 export async function ratePractice(req, res) {
-	const { practiceId } = req.params;
-	const { rating, comment } = req.body;
-	if (rating < 1 || rating > 5) {
-		return res.status(400).json({ message: 'Rating must be between 1 and 5' });
-	}
-	if (comment && comment.length > 500) {
-		return res.status(400).json({ message: 'Comment must be less than 500 characters' });	
-	}
-	const userId = req.user.sub;
-	try {
-		const practiceRating = await Rating.create({ profileId: practiceId, userId, type: 'practice', rating, comment });
-		return res.status(200).json({ message: 'Practice rated successfully', practiceRating });
-	} catch (error) {
-		return res.status(500).json({ message: error.message });
-	}
+  const { practiceId } = req.params;
+  const { rating, comment } = req.body;
+  if (rating < 1 || rating > 5) {
+    return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+  }
+  if (comment && comment.length > 500) {
+    return res
+      .status(400)
+      .json({ message: 'Comment must be less than 500 characters' });
+  }
+  const userId = req.user.sub;
+  try {
+    const practiceRating = await Rating.create({
+      profileId: practiceId,
+      userId,
+      type: 'practice',
+      rating,
+      comment,
+    });
+    return res
+      .status(200)
+      .json({ message: 'Practice rated successfully', practiceRating });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
 }

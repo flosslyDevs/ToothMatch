@@ -40,23 +40,23 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Health check
 app.get('/health', (req, res) => {
-	res.json({ status: 'ok' });
+  res.json({ status: 'ok' });
 });
 
 // Database connection
 connectToDatabase().catch(() => {
-	process.exitCode = 1;
+  process.exitCode = 1;
 });
 
 // FCM Init
-initializeFCM() || (() => {
-	throw new Error('Failed to initialize FCM');
-});
+initializeFCM() ||
+  (() => {
+    throw new Error('Failed to initialize FCM');
+  });
 
 const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 server.listen(port, () => {
-	console.log(`Server listening on port ${port}`);
+  console.log(`Server listening on port ${port}`);
 });
-
