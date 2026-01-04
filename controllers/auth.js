@@ -220,8 +220,9 @@ export async function googleAuth(event) {
 	}
 	
 	try {
-		const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-		const ticket = await client.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
+		const clientIds = process.env.GOOGLE_CLIENT_ID.split(',');
+		const client = new OAuth2Client();
+		const ticket = await client.verifyIdToken({ idToken, audience: clientIds });
 		const payload = ticket.getPayload();
 		const email = payload.email;
 		const sub = payload.sub;
@@ -394,12 +395,17 @@ export async function resetPassword(event) {
 	await user.save();
 	return { status: 200, body: { message: 'Password reset successfully' } };
 }
-export async function logout(event) {
-	const { fcmToken, deviceId } = getBody(event);
-	const userId = event.user.sub;
+export async function logout(req, res) {
+	const { fcmToken, deviceId } = req.body;
+	const userId = req.user.sub;
+
+	// Verify user ID is present
 	if (!userId) {
 		console.error('[logout] User ID is required');
+		return res.status(401).json({ message: 'Unauthorized' });
 	}
+
+	// Clear FCM Token if provided
 	if (fcmToken) {
 		try {
 			const destroyed = await UserFCMToken.destroy({ where: { userId, fcmToken } });
@@ -416,7 +422,8 @@ export async function logout(event) {
 			console.error('[logout] Error destroying device FCM token By DeviceID:', error);
 		}
 	}
-	return { status: 200, body: { message: 'Logged out successfully' } };
+
+	return res.status(200).json({ message: 'Logged out successfully' });
 }
 
 export async function resendOtp(event) {
@@ -458,3 +465,4 @@ export async function resendOtp(event) {
 		return { status: 500, body: { message: 'Unable to resend OTP', error: error?.message || String(error) } };
 	}
 }
+

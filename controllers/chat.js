@@ -7,6 +7,7 @@ import {
   UserFCMToken,
   Media,
   PracticeMedia,
+  MatchLike,
 } from "../models/index.js";
 import { Op } from "sequelize";
 import { sendChatNotification } from "../utils/fcm.js";
@@ -450,14 +451,30 @@ export async function sendMessage(req, res) {
       },
     });
 
+    // Check if the users have liked each other
+    const likesCount = await MatchLike.count({
+      where: {
+        [Op.or]: [
+          {
+            candidateUserId: senderId,
+            practiceUserId: receiverId,
+          },
+          {
+            candidateUserId: receiverId,
+            practiceUserId: senderId,
+          },
+        ],
+      },
+    });
+
     /** If there are any confirmed or completed interviews between the two users, the user is permitted to send a message */
-    const isPermitted = interviewsCount > 0;
+    const isPermitted = interviewsCount > 0 || likesCount > 0;
 
     // Check permission
     if (!isPermitted) {
       return res.status(403).json({
         message:
-          "No permission to send message. You must have a confirmed or completed interview with this user.",
+          "No permission to send message. You must either have a confirmed or completed interview with this user, or have liked each other.",
         code: "NO_PERMISSION",
       });
     }

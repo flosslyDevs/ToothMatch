@@ -1,8 +1,14 @@
 import admin from "firebase-admin";
 import fs from "fs";
+import UserFCMToken from "../models/auth/userFCMToken.js";
 
 // Initialize Firebase Admin if not already initialized
 let fcmInitialized = false;
+
+const notificationTypes = {
+  chat: "chat",
+  like: "like",
+};
 
 export const initializeFCM = () => {
   if (fcmInitialized) {
@@ -107,7 +113,7 @@ export const sendChatNotification = async (
 ) => {
   // Ensure all data values are strings (FCM requirement)
   const data = {
-    type: "chat",
+    type: notificationTypes.chat,
     messageId: String(messageData.id),
     threadId: String(messageData.threadId),
     senderId: String(messageData.senderId),
@@ -125,4 +131,49 @@ export const sendChatNotification = async (
     },
     data
   );
+};
+
+/**
+ * Sends a like notification via FCM
+ * @param {string} fcmToken - The FCM token of the recipient device
+ * @param {object} messageData - Message data containing likerId and likerType
+ * @param {string} senderName - Name of the sender
+ * @param {string} senderAvatar - Avatar of the sender
+ * @returns {Promise<Object>} FCM send result
+ */
+export const sendLikeNotification = async (
+  fcmToken,
+  messageData,
+  senderName,
+  senderAvatar
+) => {
+  const data = {
+    type: notificationTypes.like,
+    likerId: String(messageData.likerId),
+    likerType: String(messageData.likerType),
+  };
+  return sendFCMNotification(
+    fcmToken,
+    {
+      title: "New Like",
+      body: `${senderName} liked your profile!`,
+      imageUrl: senderAvatar,
+    },
+    data
+  );
+};
+
+/**
+ * Gets the FCM Tokens for a user
+ * @param {string} userId - The ID of the user
+ * @returns {Promise<string[]>} The FCM tokens of the user
+ */
+export const getFCMTokensForUser = async (userId) => {
+  try {
+    const tokens = await UserFCMToken.findAll({ where: { userId } });
+    return tokens.map((token) => token.fcmToken);
+  } catch (error) {
+    console.error("Error getting FCM tokens for user:", error);
+    throw error;
+  }
 };

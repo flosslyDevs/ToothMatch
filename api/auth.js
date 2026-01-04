@@ -10,6 +10,7 @@ import {
 	googleAuth,
 	appleAuth,
 } from '../controllers/auth.js';
+import { authMiddleware } from "../utils/auth.js";
 
 const router = express.Router();
 
@@ -43,11 +44,6 @@ router.post('/reset-password', async (req, res) => {
 	return res.status(result?.status || 200).json(result?.body ?? result);
 });
 
-router.post('/logout', async (req, res) => {
-	const result = await logout({ req, body: req.body });
-	return res.status(result?.status || 200).json(result?.body ?? result);
-});
-
 // OAuth
 router.post('/google', async (req, res) => {
 	const result = await googleAuth({ req, body: req.body });
@@ -58,5 +54,10 @@ router.post('/apple', async (req, res) => {
 	const result = await appleAuth({ req, body: req.body });
 	return res.status(result?.status || 200).json(result?.body ?? result);
 });
+
+// Apply auth middleware for logout since it requires fcm reset
+router.use(authMiddleware);
+
+router.post('/logout', logout);
 
 export default router;
