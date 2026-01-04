@@ -10,7 +10,6 @@ import {
   PracticeLocation,
   User,
   Media,
-  PracticeMedia,
 } from '../models/index.js';
 import { sendLikeNotification, getFCMTokensForUser } from '../utils/fcm.js';
 
@@ -37,8 +36,8 @@ function scoreCandidateToJob(candidate, job, jobType) {
   // jobType / working pattern match (20)
   const jtMatch =
     pref.jobType &&
-    job.jobType &&
-    normalizeStr(pref.jobType) === normalizeStr(job.jobType)
+      job.jobType &&
+      normalizeStr(pref.jobType) === normalizeStr(job.jobType)
       ? 1
       : 0;
   score += jtMatch * 10;
@@ -288,7 +287,7 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
       throw error;
     }
   } else {
-    // target is job; get job to find practice user
+    // target is job; actor is candidate
     const model = targetType === 'locum' ? LocumShift : PermanentJob;
     const job = await model.findByPk(targetId, {
       include: [
@@ -299,12 +298,22 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
       ],
     });
     if (!job) return null;
-    const candidateLike = await MatchLike.findOne({
-      where: { targetType, targetId, decision: 'like' },
-    });
-    if (!candidateLike) return null;
-    const candidateUserId = candidateLike.actorUserId;
+    const candidateUserId = actorUserId; // actor is the candidate
     const practiceUserId = job.userId;
+
+    // Check if practice has liked this candidate (mutual like required)
+    const practiceLike = await MatchLike.findOne({
+      where: {
+        actorUserId: practiceUserId,
+        targetType: 'candidate',
+        targetId: candidateUserId,
+        decision: 'like',
+      },
+    });
+    if (!practiceLike) {
+      // Practice hasn't liked the candidate yet, no match
+      return null;
+    }
 
     // fetch candidate profile+preferences for scoring
     const candidate = await CandidateProfile.findOne({
@@ -389,7 +398,7 @@ export async function likeTarget(req, res) {
             senderAvatar = profilePic?.url || null;
           } else {
             // Actor is a practice, get logo
-            const practiceLogo = await PracticeMedia.findOne({
+            const practiceLogo = await Media.findOne({
               where: { userId: actorUserId, kind: 'logo' },
             });
             senderAvatar = practiceLogo?.url || null;
