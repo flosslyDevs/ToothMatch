@@ -159,7 +159,7 @@ export async function uploadPracticeComplianceDocument(req, res) {
     const url = buildFileUrl(req, file.path);
 
     // Find or create practice compliance record
-    const [compliance, created] = await PracticeCompliance.findOrCreate({
+    const [compliance, _created] = await PracticeCompliance.findOrCreate({
       where: { userId },
       defaults: { userId, complianceDocuments: [] },
     });

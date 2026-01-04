@@ -1,11 +1,7 @@
 import {
-  User,
   PracticeProfile,
   PracticeMedia,
   PracticeLocation,
-  PracticeCompliance,
-  PracticePayment,
-  PracticeCulture,
   Rating,
 } from '../models/index.js';
 
@@ -27,7 +23,7 @@ export async function createPracticeProfile(req, res) {
     // Step 3
     locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
     // Step 4
-    compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
+    // compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
     // Step 5
     // payment, // { stripeAccountId, bankAccountDetails, invoiceEmail, billingAddress, defaultLocationRatesPerRole, cancellationPolicy }
     // Step 6
@@ -121,7 +117,7 @@ export async function upsertPracticeProfile(req, res) {
     // Step 3
     locations, // [{ address, phone, parking, publicTransport, latitude, longitude, practiceManagerName, email, practiceManagerPhone }]
     // Step 4
-    compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
+    // compliance, // { documentsRequired, yearsOfExperience, skillsOrSoftwareRequired }
     // Step 5
     // payment, // { stripeAccountId, bankAccountDetails, invoiceEmail, billingAddress, defaultLocationRatesPerRole, cancellationPolicy }
     // Step 6

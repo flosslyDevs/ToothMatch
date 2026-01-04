@@ -3,7 +3,6 @@ import {
   User,
   PracticeProfile,
   CandidateProfile,
-  PracticeMedia,
   Media,
 } from '../models/index.js';
 
@@ -182,11 +181,9 @@ export async function getPracticeInterviews(req, res) {
     // Verify user is a practice
     const practice = await User.findByPk(practiceUserId);
     if (!practice || practice.role !== 'practice') {
-      return res
-        .status(403)
-        .json({
-          message: 'Only practices can view their scheduled interviews',
-        });
+      return res.status(403).json({
+        message: 'Only practices can view their scheduled interviews',
+      });
     }
 
     // Fetch all interviews scheduled by this practice
@@ -354,20 +351,16 @@ export async function requestReschedule(req, res) {
 
     // Verify the interview belongs to this candidate
     if (interview.candidateUserId !== candidateUserId) {
-      return res
-        .status(403)
-        .json({
-          message: 'You can only request reschedule for your own interviews',
-        });
+      return res.status(403).json({
+        message: 'You can only request reschedule for your own interviews',
+      });
     }
 
     // Check if interview is already declined
     if (interview.declined) {
-      return res
-        .status(400)
-        .json({
-          message: 'Cannot request reschedule for a declined interview',
-        });
+      return res.status(400).json({
+        message: 'Cannot request reschedule for a declined interview',
+      });
     }
 
     // Validate required fields
@@ -464,11 +457,9 @@ export async function approveReschedule(req, res) {
 
     // Verify the interview belongs to this practice
     if (interview.practiceUserId !== practiceUserId) {
-      return res
-        .status(403)
-        .json({
-          message: 'You can only approve reschedule for your own interviews',
-        });
+      return res.status(403).json({
+        message: 'You can only approve reschedule for your own interviews',
+      });
     }
 
     // Check if there's a pending reschedule request
