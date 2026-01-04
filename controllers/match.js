@@ -12,6 +12,7 @@ import {
     Media,
     PracticeMedia,
 } from '../models/index.js';
+import { sendLikeNotification, getFCMTokensForUser } from '../utils/fcm.js';
 
 function normalizeStr(s) { return (s || '').toString().trim().toLowerCase(); }
 
@@ -238,8 +239,103 @@ export async function likeTarget(req, res) {
         let match = null;
         if (decision === 'like') {
             match = await ensureMatchIfMutual(actorUserId, targetType, targetId);
+            
+            // Send FCM notification to the recipient
+            try {
+                let recipientUserId = null;
+                
+                // Determine recipient based on targetType
+                if (targetType === 'candidate') {
+                    // Practice is liking candidate, so recipient is the candidate
+                    recipientUserId = targetId;
+                } else {
+                    // Candidate is liking a job, so recipient is the practice owner
+                    const model = targetType === 'locum' ? LocumShift : PermanentJob;
+                    const job = await model.findByPk(targetId);
+                    if (job) {
+                        recipientUserId = job.userId;
+                    }
+                }
+                
+                if (recipientUserId) {
+                    // Get sender's (actor's) name and avatar
+                    const senderUser = await User.findByPk(actorUserId, { attributes: ['fullName'] });
+                    const senderName = senderUser?.fullName || 'Someone';
+                    
+                    let senderAvatar = null;
+                    // Check if actor is a candidate or practice
+                    const candidateProfile = await CandidateProfile.findOne({ where: { userId: actorUserId } });
+                    if (candidateProfile) {
+                        // Actor is a candidate, get profile picture
+                        const profilePic = await Media.findOne({ 
+                            where: { userId: actorUserId, kind: 'profile_picture' } 
+                        });
+                        senderAvatar = profilePic?.url || null;
+                    } else {
+                        // Actor is a practice, get logo
+                        const practiceLogo = await PracticeMedia.findOne({ 
+                            where: { userId: actorUserId, kind: 'logo' } 
+                        });
+                        senderAvatar = practiceLogo?.url || null;
+                    }
+                    
+                    // Determine likerType (candidate or practice)
+                    const likerType = candidateProfile ? 'candidate' : 'practice';
+                    
+                    // Get recipient's FCM tokens and send notifications
+                    const fcmTokens = await getFCMTokensForUser(recipientUserId);
+                    if (fcmTokens && fcmTokens.length > 0) {
+                        const notificationPromises = fcmTokens.map(token => 
+                            sendLikeNotification(
+                                token,
+                                { likerId: actorUserId, likerType },
+                                senderName,
+                                senderAvatar
+                            )
+                        );
+                        await Promise.allSettled(notificationPromises);
+                    }
+                }
+            } catch (notificationError) {
+                // Log error but don't fail the request
+                console.error('Error sending FCM notification:', notificationError);
+            }
         }
-        return res.status(201).json({ like, match });
+        
+        // Get target profile picture/logo and name for response
+        let targetInfo = null;
+        try {
+            if (targetType === 'candidate') {
+                // Target is a candidate
+                const targetUser = await User.findByPk(targetId, { attributes: ['fullName'] });
+                const targetProfilePic = await Media.findOne({ 
+                    where: { userId: targetId, kind: 'profile_picture' } 
+                });
+                targetInfo = {
+                    name: targetUser?.fullName || null,
+                    avatar: targetProfilePic?.url || null
+                };
+            } else {
+                // Target is a job (locum or permanent), get practice info
+                const model = targetType === 'locum' ? LocumShift : PermanentJob;
+                const job = await model.findByPk(targetId);
+                if (job) {
+                    const practiceUser = await User.findByPk(job.userId, { attributes: ['fullName'] });
+                    const practiceLogo = await Media.findOne({ 
+                        where: { userId: job.userId, kind: 'logo' } 
+                    });
+                    targetInfo = {
+                        name: practiceUser?.fullName || null,
+                        avatar: practiceLogo?.url || null
+                    };
+                }
+            }
+        } catch (targetInfoError) {
+            // Log error but don't fail the request
+            console.error('Error fetching target info:', targetInfoError);
+        }
+        
+        return res.status(201).json({ like, match, target: targetInfo });
     } catch (error) {
         return res.status(500).json({ message: error.message });
     }
