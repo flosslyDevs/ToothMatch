@@ -57,31 +57,46 @@ export async function getPractitionerJobs(req, res) {
 
 		// Transform locum shifts to include job type identifier
 		const transformedLocumShifts = locumShifts.map(shift => {
-			const shiftData = shift.toJSON();
-			// Remove the original User and PracticeProfile objects to avoid duplicates
-			delete shiftData.User;
-			delete shiftData.PracticeProfile;
+			// Extract base data without circular references
+			const shiftData = { ...shift.dataValues };
+			const user = shift.User ? {
+				id: shift.User.id,
+				fullName: shift.User.fullName,
+				email: shift.User.email
+			} : null;
+			const practiceProfile = shift.PracticeProfile ? {
+				clinicType: shift.PracticeProfile.clinicType,
+				website: shift.PracticeProfile.website,
+				phoneNumber: shift.PracticeProfile.phoneNumber
+			} : null;
 			return {
 				...shiftData,
 				jobType: 'locum',
 				jobTypeLabel: 'Locum Shift',
-				user: shift.User,
-				practiceProfile: shift.PracticeProfile
+				user,
+				practiceProfile
 			};
 		});
 
 		// Transform permanent jobs to include job type identifier
 		const transformedPermanentJobs = permanentJobs.map(job => {
-			const jobData = job.toJSON();
-			// Remove the original User and PracticeProfile objects to avoid duplicates
-			delete jobData.User;
-			delete jobData.PracticeProfile;
+			const jobData = { ...job.dataValues };
+			const user = job.User ? {
+				id: job.User.id,
+				fullName: job.User.fullName,
+				email: job.User.email
+			} : null;
+			const practiceProfile = job.PracticeProfile ? {
+				clinicType: job.PracticeProfile.clinicType,
+				website: job.PracticeProfile.website,
+				phoneNumber: job.PracticeProfile.phoneNumber
+			} : null;
 			return {
 				...jobData,
 				jobType: 'permanent',
 				jobTypeLabel: 'Permanent Job',
-				user: job.User,
-				practiceProfile: job.PracticeProfile
+				user,
+				practiceProfile
 			};
 		});
 
@@ -120,7 +135,21 @@ export async function getAllJobs(req, res) {
 			include: [
 				{
 					model: User,
-					attributes: ['id', 'fullName', 'email']
+					attributes: ['id', 'fullName', 'email'],
+					include: [
+						{
+							model: Media,
+							attributes: ['kind', 'url'],
+							required: false,
+							separate: true,
+							limit: 1,
+							where: {
+								kind: {
+									[Op.in]: ['logo']
+								}
+							}
+						}
+					]
 				},
                 {
                     model: PracticeProfile,
@@ -130,7 +159,14 @@ export async function getAllJobs(req, res) {
                         {
                             model: PracticeMedia,
                             attributes: ['kind', 'url'],
-                            required: false
+                            required: false,
+                            separate: true,
+                            limit: 1,
+                            where: {
+                                kind: {
+                                    [Op.in]: ['logo']
+                                }
+                            }
                         }
                     ]
                 }
@@ -143,19 +179,26 @@ export async function getAllJobs(req, res) {
 			include: [
 				{
 					model: User,
-					attributes: ['id', 'fullName', 'email']
+					attributes: ['id', 'fullName', 'email'],
+					include: [
+						{
+							model: Media,
+							attributes: ['kind', 'url'],
+							required: false,
+							separate: true,
+							limit: 1,
+							where: {
+								kind: {
+									[Op.in]: ['logo']
+								}
+							}
+						}
+					]
 				},
                 {
                     model: PracticeProfile,
                     attributes: ['clinicType', 'website', 'phoneNumber'],
-                    required: false,
-                    include: [
-                        {
-                            model: PracticeMedia,
-                            attributes: ['kind', 'url'],
-                            required: false
-                        }
-                    ]
+                    required: false
                 }
 			],
 			order: [['createdAt', 'DESC']]
@@ -163,59 +206,59 @@ export async function getAllJobs(req, res) {
 
 		// Transform locum shifts to include job type identifier
         const transformedLocumShifts = locumShifts.map(shift => {
-			const shiftData = shift.toJSON();
-			// Remove the original User and PracticeProfile objects to avoid duplicates
-			delete shiftData.User;
-			delete shiftData.PracticeProfile;
-            // derive avatar from practice media if available (prefer 'logo')
-            let avatar = null;
+			const shiftData = { ...shift.dataValues };
+
+			let avatar = null;
             const pp = shift.PracticeProfile;
-            if (pp && pp.PracticeMedia && Array.isArray(pp.PracticeMedia)) {
-                const logo = pp.PracticeMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
-                const any = pp.PracticeMedia[0];
-                avatar = logo ? logo.url : (any ? any.url : null);
-            }
+            const media = shift.User?.Media || [];
+            const logo = media.find(m => (m.kind || '').toLowerCase() === 'logo');
+            avatar = logo ? logo.url : null;
             const practiceProfile = {
                 clinicType: pp?.clinicType ?? null,
                 website: pp?.website ?? null,
-                phoneNumber: pp?.phoneNumber ?? null,
-                PracticeMedia: Array.isArray(pp?.PracticeMedia) ? pp.PracticeMedia : [],
-                avatar
+                phoneNumber: pp?.phoneNumber ?? null
             };
+			const user = shift.User ? {
+				id: shift.User.id,
+				fullName: shift.User.fullName,
+				email: shift.User.email,
+				avatar
+			} : null;
             return {
                 ...shiftData,
                 jobType: 'locum',
                 jobTypeLabel: 'Locum Shift',
-                user: shift.User,
+                user,
                 practiceProfile
             };
 		});
 
 		// Transform permanent jobs to include job type identifier
         const transformedPermanentJobs = permanentJobs.map(job => {
-			const jobData = job.toJSON();
-			// Remove the original User and PracticeProfile objects to avoid duplicates
-			delete jobData.User;
-			delete jobData.PracticeProfile;
+			// Extract base data without circular references
+			const jobData = { ...job.dataValues };
             let avatar = null;
             const pp = job.PracticeProfile;
-            if (pp && pp.PracticeMedia && Array.isArray(pp.PracticeMedia)) {
-                const logo = pp.PracticeMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
-                const any = pp.PracticeMedia[0];
-                avatar = logo ? logo.url : (any ? any.url : null);
-            }
+            const media = job.User?.Media || [];
+            const logo = media.find(m => (m.kind || '').toLowerCase() === 'logo');
+            avatar = logo ? logo.url : null;
             const practiceProfile = {
                 clinicType: pp?.clinicType ?? null,
                 website: pp?.website ?? null,
                 phoneNumber: pp?.phoneNumber ?? null,
-                PracticeMedia: Array.isArray(pp?.PracticeMedia) ? pp.PracticeMedia : [],
                 avatar
             };
+			const user = job.User ? {
+				id: job.User.id,
+				fullName: job.User.fullName,
+				email: job.User.email,
+				avatar
+			} : null;
             return {
                 ...jobData,
                 jobType: 'permanent',
                 jobTypeLabel: 'Permanent Job',
-                user: job.User,
+                user,
                 practiceProfile
             };
 		});
@@ -307,19 +350,26 @@ export async function filterJobsForCandidates(req, res) {
 			include: [
 				{
 					model: User,
-					attributes: ['id', 'fullName', 'email']
+					attributes: ['id', 'fullName', 'email'],
+					include: [
+						{
+							model: Media,
+							attributes: ['kind', 'url'],
+							required: false,
+							separate: true,
+							limit: 1,
+							where: {
+								kind: {
+									[Op.in]: ['logo']
+								}
+							}
+						}
+					]
 				},
 				{
 					model: PracticeProfile,
 					attributes: ['clinicType', 'website', 'phoneNumber'],
-					required: false,
-					include: [
-						{
-							model: PracticeMedia,
-							attributes: ['kind', 'url'],
-							required: false
-						}
-					]
+					required: false
 				}
 			]
 		});
@@ -330,19 +380,26 @@ export async function filterJobsForCandidates(req, res) {
 			include: [
 				{
 					model: User,
-					attributes: ['id', 'fullName', 'email']
+					attributes: ['id', 'fullName', 'email'],
+					include: [
+						{
+							model: Media,
+							attributes: ['kind', 'url'],
+							required: false,
+							separate: true,
+							limit: 1,
+							where: {
+								kind: {
+									[Op.in]: ['logo']
+								}
+							}
+						}
+					]
 				},
 				{
 					model: PracticeProfile,
 					attributes: ['clinicType', 'website', 'phoneNumber'],
-					required: false,
-					include: [
-						{
-							model: PracticeMedia,
-							attributes: ['kind', 'url'],
-							required: false
-						}
-					]
+					required: false
 				}
 			]
 		});
@@ -507,62 +564,66 @@ export async function filterJobsForCandidates(req, res) {
 
 		// Transform locum shifts
 		const transformedLocumShifts = filteredLocumShifts.map(shift => {
-			const shiftData = shift.toJSON();
-			delete shiftData.User;
-			delete shiftData.PracticeProfile;
+			const shiftData = { ...shift.dataValues };
 
 			// derive avatar from practice media if available (prefer 'logo')
 			let avatar = null;
 			const pp = shift.PracticeProfile;
-			if (pp && pp.PracticeMedia && Array.isArray(pp.PracticeMedia)) {
-				const logo = pp.PracticeMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
-				const any = pp.PracticeMedia[0];
-				avatar = logo ? logo.url : (any ? any.url : null);
-			}
+			const media = shift.User?.Media || [];
+			const logo = media.find(m => (m.kind || '').toLowerCase() === 'logo');
+			avatar = logo ? logo.url : null;
 
 			const practiceProfile = {
 				clinicType: pp?.clinicType ?? null,
 				website: pp?.website ?? null,
-				phoneNumber: pp?.phoneNumber ?? null,
-				avatar
+				phoneNumber: pp?.phoneNumber ?? null
 			};
+
+			const user = shift.User ? {
+				id: shift.User.id,
+				fullName: shift.User.fullName,
+				email: shift.User.email,
+				avatar
+			} : null;
 
 			return {
 				...shiftData,
 				jobType: 'locum',
 				jobTypeLabel: 'Locum Shift',
-				user: shift.User,
+				user,
 				practiceProfile
 			};
 		});
 
 		// Transform permanent jobs
 		const transformedPermanentJobs = filteredPermanentJobs.map(job => {
-			const jobData = job.toJSON();
-			delete jobData.User;
-			delete jobData.PracticeProfile;
+			const jobData = { ...job.dataValues };
 
 			// derive avatar from practice media if available (prefer 'logo')
 			let avatar = null;
 			const pp = job.PracticeProfile;
-			if (pp && pp.PracticeMedia && Array.isArray(pp.PracticeMedia)) {
-				const logo = pp.PracticeMedia.find(m => (m.kind || '').toLowerCase() === 'logo');
-				const any = pp.PracticeMedia[0];
-				avatar = logo ? logo.url : (any ? any.url : null);
-			}
+			const media = job.User?.Media || [];
+			const logo = media.find(m => (m.kind || '').toLowerCase() === 'logo');
+			avatar = logo ? logo.url : null;
 
 			const practiceProfile = {
 				clinicType: pp?.clinicType ?? null,
 				website: pp?.website ?? null,
-				phoneNumber: pp?.phoneNumber ?? null,
-				avatar
+				phoneNumber: pp?.phoneNumber ?? null
 			};
+
+			const user = job.User ? {
+				id: job.User.id,
+				fullName: job.User.fullName,
+				email: job.User.email,
+				avatar
+			} : null;
 
 			return {
 				...jobData,
 				jobType: 'permanent',
 				jobTypeLabel: 'Permanent Job',
-				user: job.User,
+				user,
 				practiceProfile
 			};
 		});

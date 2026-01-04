@@ -125,12 +125,14 @@ export async function getCandidateInterviews(req, res) {
 						model: PracticeProfile,
 						attributes: ['id', 'clinicType', 'phoneNumber']
 					}, {
-						model: PracticeMedia,
+						model: Media,
 						attributes: ['id', 'kind', 'url'],
 						required: false,
+						limit: 1,
+						separate: true,
 						where: {
 							kind: 'logo',
-						},
+						}
 					}]
 				}
 			],
@@ -230,9 +232,11 @@ export async function getMyInterviews(req, res) {
 						  attributes: ["id", "clinicType", "phoneNumber"],
 						},
 						{
-						  model: PracticeMedia,
+						  model: Media,
 						  attributes: ["id", "kind", "url"],
 						  required: false,
+						  limit: 1,
+						  separate: true,
 						  where: {
 							kind: "logo",
 						  },
