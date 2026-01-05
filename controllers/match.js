@@ -393,7 +393,7 @@ export async function likeTarget(req, res) {
           if (candidateProfile) {
             // Actor is a candidate, get profile picture
             const profilePic = await Media.findOne({
-              where: { userId: actorUserId, kind: 'profile_picture' },
+              where: { userId: actorUserId, kind: 'profile_photo' },
             });
             senderAvatar = profilePic?.url || null;
           } else {
@@ -436,7 +436,7 @@ export async function likeTarget(req, res) {
           attributes: ['fullName'],
         });
         const targetProfilePic = await Media.findOne({
-          where: { userId: targetId, kind: 'profile_picture' },
+          where: { userId: targetId, kind: 'profile_photo' },
         });
         targetInfo = {
           name: targetUser?.fullName || null,
@@ -502,7 +502,7 @@ export async function getMatches(req, res) {
           where: { userId: m.candidateUserId },
         });
         const candidateProfilePicture = await Media.findOne({
-          where: { userId: m.candidateUserId, kind: 'profile_picture' },
+          where: { userId: m.candidateUserId, kind: 'profile_photo' },
         });
         const practiceProfile = await PracticeProfile.findOne({
           where: { userId: m.practiceUserId },

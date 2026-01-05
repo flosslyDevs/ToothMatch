@@ -19,9 +19,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in miles
 }
@@ -73,17 +73,17 @@ export async function getPractitionerJobs(req, res) {
       const shiftData = { ...shift.dataValues };
       const user = shift.User
         ? {
-            id: shift.User.id,
-            fullName: shift.User.fullName,
-            email: shift.User.email,
-          }
+          id: shift.User.id,
+          fullName: shift.User.fullName,
+          email: shift.User.email,
+        }
         : null;
       const practiceProfile = shift.PracticeProfile
         ? {
-            clinicType: shift.PracticeProfile.clinicType,
-            website: shift.PracticeProfile.website,
-            phoneNumber: shift.PracticeProfile.phoneNumber,
-          }
+          clinicType: shift.PracticeProfile.clinicType,
+          website: shift.PracticeProfile.website,
+          phoneNumber: shift.PracticeProfile.phoneNumber,
+        }
         : null;
       return {
         ...shiftData,
@@ -99,17 +99,17 @@ export async function getPractitionerJobs(req, res) {
       const jobData = { ...job.dataValues };
       const user = job.User
         ? {
-            id: job.User.id,
-            fullName: job.User.fullName,
-            email: job.User.email,
-          }
+          id: job.User.id,
+          fullName: job.User.fullName,
+          email: job.User.email,
+        }
         : null;
       const practiceProfile = job.PracticeProfile
         ? {
-            clinicType: job.PracticeProfile.clinicType,
-            website: job.PracticeProfile.website,
-            phoneNumber: job.PracticeProfile.phoneNumber,
-          }
+          clinicType: job.PracticeProfile.clinicType,
+          website: job.PracticeProfile.website,
+          phoneNumber: job.PracticeProfile.phoneNumber,
+        }
         : null;
       return {
         ...jobData,
@@ -239,11 +239,11 @@ export async function getAllJobs(req, res) {
       };
       const user = shift.User
         ? {
-            id: shift.User.id,
-            fullName: shift.User.fullName,
-            email: shift.User.email,
-            avatar,
-          }
+          id: shift.User.id,
+          fullName: shift.User.fullName,
+          email: shift.User.email,
+          avatar,
+        }
         : null;
       return {
         ...shiftData,
@@ -271,11 +271,11 @@ export async function getAllJobs(req, res) {
       };
       const user = job.User
         ? {
-            id: job.User.id,
-            fullName: job.User.fullName,
-            email: job.User.email,
-            avatar,
-          }
+          id: job.User.id,
+          fullName: job.User.fullName,
+          email: job.User.email,
+          avatar,
+        }
         : null;
       return {
         ...jobData,
@@ -637,11 +637,11 @@ export async function filterJobsForCandidates(req, res) {
 
       const user = shift.User
         ? {
-            id: shift.User.id,
-            fullName: shift.User.fullName,
-            email: shift.User.email,
-            avatar,
-          }
+          id: shift.User.id,
+          fullName: shift.User.fullName,
+          email: shift.User.email,
+          avatar,
+        }
         : null;
 
       return {
@@ -672,11 +672,11 @@ export async function filterJobsForCandidates(req, res) {
 
       const user = job.User
         ? {
-            id: job.User.id,
-            fullName: job.User.fullName,
-            email: job.User.email,
-            avatar,
-          }
+          id: job.User.id,
+          fullName: job.User.fullName,
+          email: job.User.email,
+          avatar,
+        }
         : null;
 
       return {
@@ -780,7 +780,7 @@ export async function filterCandidatesForPractices(req, res) {
               separate: true,
               limit: 1,
               where: {
-                kind: 'profile_picture',
+                kind: 'profile_photo',
               },
             },
           ],
@@ -883,11 +883,11 @@ export async function filterCandidatesForPractices(req, res) {
       const json = c.toJSON();
       const userMedia = Array.isArray(json.User?.Media) ? json.User.Media : [];
 
-      // derive avatar from candidate media (prefer 'profile_picture', then 'logo', then first)
+      // derive avatar from candidate media (prefer 'profile_photo', then 'logo', then first)
       let avatar = null;
       if (userMedia.length > 0) {
         const profilePic = userMedia.find(
-          (m) => (m.kind || '').toLowerCase() === 'profile_picture'
+          (m) => (m.kind || '').toLowerCase() === 'profile_photo'
         );
         const logo = userMedia.find(
           (m) => (m.kind || '').toLowerCase() === 'logo'

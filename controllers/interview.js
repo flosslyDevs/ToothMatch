@@ -204,7 +204,7 @@ export async function getPracticeInterviews(req, res) {
               attributes: ['id', 'kind', 'url'],
               required: false,
               where: {
-                kind: 'profile_picture',
+                kind: 'profile_photo',
               },
             },
           ],
@@ -315,7 +315,7 @@ export async function getMyInterviews(req, res) {
                 separate: true,
                 required: false,
                 where: {
-                  kind: 'profile_picture',
+                  kind: 'profile_photo',
                 },
               },
             ],

@@ -71,7 +71,7 @@ export async function getBookings(req, res) {
             required: false,
             where: {
               kind: {
-                [Op.in]: ['logo', 'profile_picture'],
+                [Op.in]: ['logo', 'profile_photo'],
               },
             },
             order: [['createdAt', 'DESC']],
