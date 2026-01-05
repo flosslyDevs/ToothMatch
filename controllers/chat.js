@@ -7,7 +7,7 @@ import {
   UserFCMToken,
   Media,
   PracticeMedia,
-  MatchLike,
+  Match,
 } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sendChatNotification } from '../utils/fcm.js';
@@ -315,14 +315,14 @@ export async function getChats(req, res) {
         timestamp: latestMessage?.createdAt ?? thread.createdAt,
         message: latestMessage
           ? {
-              id: latestMessage.id,
-              senderId: latestMessage.senderId,
-              message: latestMessage.message,
-            }
+            id: latestMessage.id,
+            senderId: latestMessage.senderId,
+            message: latestMessage.message,
+          }
           : {
-              senderId: null,
-              message: 'You started a new conversation',
-            },
+            senderId: null,
+            message: 'You started a new conversation',
+          },
         lastReadAt: participant.lastReadAt,
         muted: participant.muted,
         archived: participant.archived,
@@ -445,23 +445,16 @@ export async function sendMessage(req, res) {
     });
 
     // Check if the users have liked each other
-    const likesCount = await MatchLike.count({
+    const matchExists = await Match.findOne({
       where: {
-        [Op.or]: [
-          {
-            candidateUserId: senderId,
-            practiceUserId: receiverId,
-          },
-          {
-            candidateUserId: receiverId,
-            practiceUserId: senderId,
-          },
-        ],
+        [Op.or]: [{ candidateUserId: senderId }, { practiceUserId: senderId }],
+        status: 'matched',
       },
+      attributes: ['id'],
     });
 
     /** If there are any confirmed or completed interviews between the two users, the user is permitted to send a message */
-    const isPermitted = interviewsCount > 0 || likesCount > 0;
+    const isPermitted = interviewsCount > 0 || matchExists;
 
     // Check permission
     if (!isPermitted) {
@@ -480,7 +473,7 @@ export async function sendMessage(req, res) {
           attributes: ['url'],
           required: false,
           where: {
-            kind: 'profile_picture',
+            kind: 'profile_photo',
           },
         },
         {
