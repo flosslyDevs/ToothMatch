@@ -1,4 +1,5 @@
-import { Event, Booking } from '../models/index.js';
+import { Event, Booking, User, Media } from '../models/index.js';
+import { Op } from 'sequelize';
 
 // Get all events (no pagination, returns all records)
 export async function getEvents(req, res) {
@@ -55,8 +56,41 @@ export async function bookEvent(req, res) {
 export async function getBookings(req, res) {
   try {
     const userId = req.user.sub;
-    const bookings = await Booking.findAll({ where: { userId } });
-    return res.status(200).json({ bookings });
+    const bookings = await Booking.findAll({
+      where: { userId },
+      include: [{
+        model: Event,
+        include: [{
+          model: User,
+          attributes: ['id', 'fullName'],
+          include: [{
+            model: Media,
+            attributes: ['kind', 'url'],
+            limit: 1,
+            separate: true,
+            required: false,
+            where: {
+              kind: {
+                [Op.in]: ['logo', 'profile_picture'],
+              },
+            },
+            order: [['createdAt', 'DESC']],
+          }],
+        }]
+      }],
+    });
+    const bookingsWithAvatar = bookings.map((booking) => {
+      const bookingData = booking.toJSON();
+      const avatar = bookingData.Event?.User?.Media?.[0]?.url || null;
+      bookingData.event = bookingData.Event;
+      delete bookingData.Event;
+      bookingData.event.user = bookingData.event?.User || null;
+      delete bookingData.event?.User;
+      delete bookingData.event?.user?.Media;
+      bookingData.event.user.avatar = avatar;
+      return bookingData;
+    });
+    return res.status(200).json({ bookings: bookingsWithAvatar });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
