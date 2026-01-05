@@ -237,6 +237,20 @@ export async function getChats(req, res) {
                   model: User,
                   attributes: ['id', 'fullName'],
                   required: false,
+                  include: [
+                    {
+                      model: Media,
+                      attributes: ['kind', 'url'],
+                      limit: 1,
+                      separate: true,
+                      required: false,
+                      where: {
+                        kind: {
+                          [Op.in]: ['logo', 'profile_photo'],
+                        },
+                      },
+                    },
+                  ],
                 },
               ],
             },
@@ -249,38 +263,18 @@ export async function getChats(req, res) {
       `[getChats] Found ${userParticipants.length} chat threads for userId=${userId}`
     );
 
-    const otherUserIds = userParticipants
-      .map((p) => {
-        const otherParticipant = p.ChatThread?.ChatThreadParticipants?.[0];
-        return otherParticipant?.userId;
-      })
-      .filter(Boolean);
-
-    // Batch fetch all media for other users
-    const [profilePictures, practiceLogos] = await Promise.all([
-      Media.findAll({
-        where: {
-          userId: { [Op.in]: otherUserIds },
-          kind: 'profile_picture',
-        },
-        attributes: ['userId', 'url'],
-      }),
-      PracticeMedia.findAll({
-        where: {
-          userId: { [Op.in]: otherUserIds },
-          kind: 'logo',
-        },
-        attributes: ['userId', 'url'],
-      }),
-    ]);
-
-    // Create lookup maps for media
-    const profilePictureMap = new Map(
-      profilePictures.map((m) => [m.userId, m.url])
-    );
-    const practiceLogoMap = new Map(
-      practiceLogos.map((m) => [m.userId, m.url])
-    );
+    // Avatar map for other users
+    const avatarMap = new Map();
+    for (const participant of userParticipants) {
+      const otherParticipant = participant.ChatThread?.ChatThreadParticipants?.[0];
+      if (!otherParticipant) {
+        continue;
+      }
+      const otherUserId = otherParticipant.userId;
+      const otherUser = otherParticipant.User;
+      const avatar = otherUser?.Media?.[0]?.url || null;
+      avatarMap.set(otherUserId, avatar);
+    }
 
     // Build response data
     const chatsData = [];
@@ -311,9 +305,8 @@ export async function getChats(req, res) {
         id: otherUserId,
         name: otherUser?.fullName || null,
         avatar:
-          profilePictureMap.get(otherUserId) ||
-          practiceLogoMap.get(otherUserId) ||
-          null,
+          avatarMap.get(otherUserId) ||
+          null
       };
 
       chatsData.push({
