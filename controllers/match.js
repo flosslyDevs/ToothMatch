@@ -86,14 +86,20 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
   // If actor is candidate liking job: candidateUserId=actor, practiceUserId=job.userId
   // If actor is practice liking candidate: candidateUserId=targetId, practiceUserId=actor
   if (targetType === 'candidate') {
-    const candidateUserId = targetId;
+    const candidateProfileId = targetId;
     const practiceUserId = actorUserId;
 
     try {
+      const candidateProfile = await CandidateProfile.findByPk(candidateProfileId);
+      if (!candidateProfile) {
+        console.log(`[ensureMatchIfMutual] Candidate profile not found, returning null`);
+        return null;
+      }
+      const userId = candidateProfile.userId;
       // Find all jobs the candidate has liked
       const candidateLikes = await MatchLike.findAll({
         where: {
-          actorUserId: candidateUserId,
+          actorUserId: userId,
           targetType: { [Op.in]: ['locum', 'permanent'] },
           decision: 'like',
         },
