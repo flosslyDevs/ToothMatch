@@ -95,11 +95,11 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
         console.log(`[ensureMatchIfMutual] Candidate profile not found, returning null`);
         return null;
       }
-      const userId = candidateProfile.userId;
+      const candidateUserId = candidateProfile.userId;
       // Find all jobs the candidate has liked
       const candidateLikes = await MatchLike.findAll({
         where: {
-          actorUserId: userId,
+          actorUserId: candidateUserId,
           targetType: { [Op.in]: ['locum', 'permanent'] },
           decision: 'like',
         },
