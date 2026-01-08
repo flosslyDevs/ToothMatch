@@ -475,14 +475,15 @@ export async function appleAuth(event) {
     userId: user.id,
     role: user.role,
   });
-  return {
-    status: 200,
-    body: {
-      token,
-      user: { id: user.id, email: user.email, role: user.role },
-      isProfileComplete,
-    },
+
+  const body = {
+    token,
+    user: { id: user.id, email: user.email, role: user.role },
+    isProfileComplete,
   };
+
+  logger.debug('Apple auth successful', body);
+  return { status: 200, body };
 }
 
 export async function forgetPasswordRequest(event) {
