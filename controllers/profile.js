@@ -315,13 +315,19 @@ export async function uploadMedia(req, res) {
   try {
     logger.debug('Uploading media', { userId, kind });
     let media = null;
-    // Replace media if its cover or profile picture
-    if (kind === 'cover_photo' || kind === 'profile_photo') {
-      media = await Media.update({ url }, { where: { userId, kind } });
+    const isSingleSlot = kind === 'cover_photo' || kind === 'profile_photo';
+    // Replace media if it's cover or profile picture; create otherwise
+    if (isSingleSlot) {
+      media = await Media.findOne({ where: { userId, kind } });
+      if (media) {
+        await media.update({ url });
+      } else {
+        media = await Media.create({ userId, kind, url });
+      }
     } else {
       media = await Media.create({ userId, kind, url });
     }
-    logger.info('Media uploaded', { userId, kind });
+    logger.info('Media uploaded', { userId, kind, mediaId: media?.id });
     return res.status(201).json({ media });
   } catch (error) {
     logger.error(

@@ -33,13 +33,19 @@ export async function uploadUserMedia(req, res) {
     logger.debug('Uploading user media', { userId, kind });
     const url = buildFileUrl(req, file.path);
     let media = null;
-    // Replace media if its cover or profile picture
-    if (kind === 'cover_photo' || kind === 'profile_photo') {
-      media = await Media.update({ url }, { where: { userId, kind } });
+    const isSingleSlot = kind === 'cover_photo' || kind === 'profile_photo';
+    // Replace media if it's cover or profile picture; create otherwise
+    if (isSingleSlot) {
+      media = await Media.findOne({ where: { userId, kind } });
+      if (media) {
+        await media.update({ url });
+      } else {
+        media = await Media.create({ userId, kind, url });
+      }
     } else {
       media = await Media.create({ userId, kind, url });
     }
-    logger.info('User media uploaded', { userId, kind, mediaId: media.id });
+    logger.info('User media uploaded', { userId, kind, mediaId: media?.id });
     return res.status(201).json({ media });
   } catch (error) {
     logger.error(
@@ -97,9 +103,15 @@ export async function uploadPracticeMedia(req, res) {
     for (const file of files) {
       const url = buildFileUrl(req, file.path);
       let media = null;
-      // Replace media if its logo
-      if (kind === 'logo') {
-        media = await Media.update({ url }, { where: { userId, kind } });
+      const isSingleSlot = kind === 'logo';
+      // Replace media if it's logo; create otherwise
+      if (isSingleSlot) {
+        media = await Media.findOne({ where: { userId, kind } });
+        if (media) {
+          await media.update({ url });
+        } else {
+          media = await Media.create({ userId, kind, url });
+        }
       } else {
         media = await Media.create({ userId, kind, url });
       }
