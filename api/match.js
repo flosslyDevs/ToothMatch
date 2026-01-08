@@ -10,5 +10,3 @@ router.post('/like', likeTarget);
 router.get('/matches', getMatches);
 
 export default router;
-
-

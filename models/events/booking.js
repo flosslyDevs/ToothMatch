@@ -1,9 +1,9 @@
-import { DataTypes } from "sequelize";
-import { sequelize } from "../../services/db.js";
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../../services/db.js';
 
 // Booking for an event
 const Booking = sequelize?.define(
-  "Booking",
+  'Booking',
   {
     /** ID of the booking */
     id: {
@@ -12,12 +12,20 @@ const Booking = sequelize?.define(
       primaryKey: true,
     },
     /** ID of the profile who is booking the event */
-    userId: { type: DataTypes.UUID, allowNull: false, unique: "uq_booking_user_event" },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      unique: 'uq_booking_user_event',
+    },
     /** ID of the event */
-    eventId: { type: DataTypes.UUID, allowNull: false, unique: "uq_booking_user_event" },
+    eventId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      unique: 'uq_booking_user_event',
+    },
   },
   {
-    tableName: "bookings",
+    tableName: 'bookings',
     underscored: true,
   }
 );

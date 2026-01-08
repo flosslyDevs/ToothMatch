@@ -1,14 +1,14 @@
 import express from 'express';
 import { authMiddleware } from '../utils/auth.js';
-import { 
-	scheduleInterview, 
-	getCandidateInterviews, 
-	getPracticeInterviews,
-	getMyInterviews,
-	requestReschedule,
-	approveReschedule,
-	declineInterview,
-	acceptInterview
+import {
+  scheduleInterview,
+  getCandidateInterviews,
+  getPracticeInterviews,
+  getMyInterviews,
+  requestReschedule,
+  approveReschedule,
+  declineInterview,
+  acceptInterview,
 } from '../controllers/interview.js';
 
 const router = express.Router();
@@ -41,4 +41,3 @@ router.post('/:id/accept', acceptInterview);
 router.post('/:id/decline', declineInterview);
 
 export default router;
-

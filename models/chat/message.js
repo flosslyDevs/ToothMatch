@@ -1,8 +1,8 @@
-import { DataTypes } from "sequelize";
-import { sequelize } from "../../services/db.js";
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../../services/db.js';
 
 const ChatMessage = sequelize.define(
-  "ChatMessage",
+  'ChatMessage',
   {
     id: {
       type: DataTypes.UUID,
@@ -16,9 +16,9 @@ const ChatMessage = sequelize.define(
     updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },
   {
-    tableName: "chat_messages",
+    tableName: 'chat_messages',
     underscored: true,
-    indexes: [{ fields: ["thread_id", "created_at"] }],
+    indexes: [{ fields: ['thread_id', 'created_at'] }],
   }
 );
 

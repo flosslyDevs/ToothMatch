@@ -1,6 +1,13 @@
 import express from 'express';
 import { authMiddleware } from '../utils/auth.js';
-import { getPractitionerJobs, getAllJobs, filterJobsForCandidates, filterCandidatesForPractices, activateJob, pauseJob } from '../controllers/jobs.js';
+import {
+  getPractitionerJobs,
+  getAllJobs,
+  filterJobsForCandidates,
+  filterCandidatesForPractices,
+  activateJob,
+  pauseJob,
+} from '../controllers/jobs.js';
 
 const router = express.Router();
 

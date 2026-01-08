@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.nuxt/
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.*
+
+# Cache directories
+.cache/
+.parcel-cache/
+.npm/
+.yarn/
+
+# Uploads directory
+uploads/
+
+# Firebase service account
+*.json
+!package.json
+!package-lock.json
+!.prettierrc.json
+
+# Lock files (optional - you may want to format these)
+package-lock.json
+yarn.lock
+
