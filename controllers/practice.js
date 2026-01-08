@@ -1,8 +1,9 @@
 import {
   PracticeProfile,
-  PracticeMedia,
   PracticeLocation,
+  Media,
   Rating,
+  User,
 } from '../models/index.js';
 import { logger as loggerRoot } from '../utils/logger.js';
 
@@ -64,9 +65,7 @@ export async function createPracticeProfile(req, res) {
 
     // Step 1: Media (create all)
     if (Array.isArray(media)) {
-      await Promise.all(
-        media.map((m) => PracticeMedia.create({ ...m, userId }))
-      );
+      await Promise.all(media.map((m) => Media.create({ ...m, userId })));
     }
 
     // Step 3: Locations (create all)
@@ -165,10 +164,8 @@ export async function upsertPracticeProfile(req, res) {
 
     // Step 1: Media (replace all)
     if (Array.isArray(media)) {
-      await PracticeMedia.destroy({ where: { userId } });
-      await Promise.all(
-        media.map((m) => PracticeMedia.create({ ...m, userId }))
-      );
+      await Media.destroy({ where: { userId } });
+      await Promise.all(media.map((m) => Media.create({ ...m, userId })));
     }
 
     // Step 3: Locations (replace all)
@@ -217,7 +214,7 @@ export async function getPracticeProfile(req, res) {
   try {
     logger.debug('Fetching practice profile', { userId });
     const profile = await PracticeProfile.findOne({ where: { userId } });
-    const media = await PracticeMedia.findAll({ where: { userId } });
+    const media = await Media.findAll({ where: { userId } });
     const locations = await PracticeLocation.findAll({ where: { userId } });
     const ratings = await Rating.findAll({
       where: { profileId: profile.id, type: 'practice' },
@@ -247,18 +244,32 @@ export async function getAllUserProfiles(req, res) {
       where: { userId },
       include: [
         {
-          model: PracticeMedia,
+          model: User,
+          attributes: ['id', 'fullName', 'email'],
+          include: [
+            {
+              model: Media,
+              attributes: ['kind', 'url'],
+              required: false,
+            },
+          ],
         },
         {
           model: PracticeLocation,
         },
-        // {
-        // 	model: PracticeCompliance
-        // }
       ],
     });
+
+    // Handle legacy structure
+    const profilesWithLegacyMedia = profiles.map((profile) => {
+      return {
+        ...profile.toJSON(),
+        PracticeMedia: profile.User.Media || [],
+      };
+    });
+
     logger.debug('User profiles fetched', { userId, count: profiles.length });
-    return res.status(200).json({ profiles });
+    return res.status(200).json({ profiles: profilesWithLegacyMedia });
   } catch (error) {
     logger.error(
       'Error fetching user profiles',
@@ -279,14 +290,19 @@ export async function getSpecificPractice(req, res) {
     let profile = await PracticeProfile.findByPk(practiceId, {
       include: [
         {
-          model: PracticeMedia,
+          model: User,
+          attributes: ['id', 'fullName', 'email'],
+          include: [
+            {
+              model: Media,
+              attributes: ['kind', 'url'],
+              required: false,
+            },
+          ],
         },
         {
           model: PracticeLocation,
         },
-        // {
-        // 	model: PracticeCompliance
-        // }
       ],
     });
 
@@ -296,7 +312,15 @@ export async function getSpecificPractice(req, res) {
         where: { userId: practiceId },
         include: [
           {
-            model: PracticeMedia,
+            model: User,
+            attributes: ['id', 'fullName', 'email'],
+            include: [
+              {
+                model: Media,
+                attributes: ['kind', 'url'],
+                required: false,
+              },
+            ],
           },
           {
             model: PracticeLocation,
@@ -311,18 +335,8 @@ export async function getSpecificPractice(req, res) {
     }
 
     // Extract logo from media (prefer kind='logo', else first item)
-    const practiceMedia = profile.PracticeMedia || [];
-    let logo = null;
-    if (practiceMedia.length > 0) {
-      const logoMedia = practiceMedia.find(
-        (m) => (m.kind || '').toLowerCase() === 'logo'
-      );
-      logo = logoMedia
-        ? logoMedia.url
-        : practiceMedia[0]
-          ? practiceMedia[0].url
-          : null;
-    }
+    const media = profile.User?.Media || [];
+    const logo = media.find((m) => m.kind === 'logo')?.url || null;
 
     // Add logo to profile object
     const profileWithLogo = {
@@ -330,10 +344,15 @@ export async function getSpecificPractice(req, res) {
       logo,
     };
 
+    const profileWithLegacyMedia = {
+      ...profileWithLogo,
+      PracticeMedia: media,
+    };
+
     logger.debug('Specific practice fetched', { practiceId });
     return res.status(200).json({
-      profile: profileWithLogo,
-      media: practiceMedia,
+      profile: profileWithLegacyMedia,
+      media,
       locations: profile.PracticeLocation || [],
     });
   } catch (error) {

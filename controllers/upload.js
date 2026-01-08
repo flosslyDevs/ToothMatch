@@ -1,7 +1,6 @@
 import path from 'path';
 import {
   Media,
-  PracticeMedia,
   IdentityDocument,
   PracticeCompliance,
 } from '../models/index.js';
@@ -52,7 +51,7 @@ export async function uploadUserMedia(req, res) {
   }
 }
 
-// Upload practice media (e.g., logo/avatar) to PracticeMedia
+// Upload practice media (e.g., logo/avatar) to Media
 export async function uploadPracticeMedia(req, res) {
   const logger = loggerBase.child('uploadPracticeMedia');
   const userId = req.user?.sub;
@@ -100,12 +99,9 @@ export async function uploadPracticeMedia(req, res) {
       let media = null;
       // Replace media if its logo
       if (kind === 'logo') {
-        media = await PracticeMedia.update(
-          { url },
-          { where: { userId, kind } }
-        );
+        media = await Media.update({ url }, { where: { userId, kind } });
       } else {
-        media = await PracticeMedia.create({ userId, kind, url });
+        media = await Media.create({ userId, kind, url });
       }
       mediaItems.push(media);
     }

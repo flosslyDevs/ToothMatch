@@ -4,7 +4,6 @@ import {
   User,
   PracticeProfile,
   PracticeLocation,
-  PracticeMedia,
   JobPreference,
   CandidateProfile,
   Media,
@@ -179,9 +178,7 @@ export async function getAllJobs(req, res) {
               separate: true,
               limit: 1,
               where: {
-                kind: {
-                  [Op.in]: ['logo'],
-                },
+                kind: 'logo',
               },
             },
           ],
@@ -190,20 +187,6 @@ export async function getAllJobs(req, res) {
           model: PracticeProfile,
           attributes: ['clinicType', 'website', 'phoneNumber'],
           required: false,
-          include: [
-            {
-              model: PracticeMedia,
-              attributes: ['kind', 'url'],
-              required: false,
-              separate: true,
-              limit: 1,
-              where: {
-                kind: {
-                  [Op.in]: ['logo'],
-                },
-              },
-            },
-          ],
         },
       ],
       order: [['createdAt', 'DESC']],
@@ -223,9 +206,7 @@ export async function getAllJobs(req, res) {
               separate: true,
               limit: 1,
               where: {
-                kind: {
-                  [Op.in]: ['logo'],
-                },
+                kind: 'logo',
               },
             },
           ],
@@ -403,9 +384,7 @@ export async function filterJobsForCandidates(req, res) {
               separate: true,
               limit: 1,
               where: {
-                kind: {
-                  [Op.in]: ['logo'],
-                },
+                kind: 'logo',
               },
             },
           ],
@@ -433,9 +412,7 @@ export async function filterJobsForCandidates(req, res) {
               separate: true,
               limit: 1,
               where: {
-                kind: {
-                  [Op.in]: ['logo'],
-                },
+                kind: 'logo',
               },
             },
           ],

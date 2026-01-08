@@ -6,7 +6,6 @@ import {
   WorkPersonality,
   Skill,
   Specialization,
-  PracticeMedia,
   PracticeLocation,
   PracticeCompliance,
   PracticePayment,
@@ -662,7 +661,7 @@ export async function getUnifiedProfile(req, res) {
       profileExists: !!practiceProfile,
     });
 
-    const practiceMedia = await PracticeMedia.findAll({ where: { userId } });
+    const practiceMedia = await Media.findAll({ where: { userId } });
     logger.debug('Practice media fetched', {
       userId,
       count: practiceMedia.length,
@@ -799,7 +798,7 @@ export async function deleteProfile(req, res) {
       IdentityDocument.destroy({ where: { userId }, transaction }),
       JobPreference.destroy({ where: { userId }, transaction }),
       AvailabilitySlot.destroy({ where: { userId }, transaction }),
-      PracticeMedia.destroy({ where: { userId }, transaction }),
+      Media.destroy({ where: { userId }, transaction }),
       PracticeLocation.destroy({ where: { userId }, transaction }),
       PracticeCompliance.destroy({ where: { userId }, transaction }),
       PracticePayment.destroy({ where: { userId }, transaction }),

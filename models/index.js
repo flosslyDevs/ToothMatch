@@ -14,7 +14,6 @@ import IdentityDocument from './profile/identityDocument.js';
 import JobPreference from './profile/jobPreference.js';
 import AvailabilitySlot from './profile/availabilitySlot.js';
 import PracticeProfile from './practice/practiceProfile.js';
-import PracticeMedia from './practice/practiceMedia.js';
 import PracticeLocation from './practice/practiceLocation.js';
 import PracticeCompliance from './practice/practiceCompliance.js';
 import PracticePayment from './practice/practicePayment.js';
@@ -84,9 +83,6 @@ User.hasMany(AvailabilitySlot, { foreignKey: 'userId' });
 PracticeProfile.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(PracticeProfile, { foreignKey: 'userId' });
 
-PracticeMedia.belongsTo(User, { foreignKey: 'userId' });
-User.hasMany(PracticeMedia, { foreignKey: 'userId' });
-
 PracticeLocation.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(PracticeLocation, { foreignKey: 'userId' });
 
@@ -94,15 +90,6 @@ PracticeCompliance.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(PracticeCompliance, { foreignKey: 'userId' });
 
 // Practice Profile associations with related models
-PracticeProfile.hasMany(PracticeMedia, {
-  foreignKey: 'userId',
-  sourceKey: 'userId',
-});
-PracticeMedia.belongsTo(PracticeProfile, {
-  foreignKey: 'userId',
-  targetKey: 'userId',
-});
-
 PracticeProfile.hasMany(PracticeLocation, {
   foreignKey: 'userId',
   sourceKey: 'userId',
@@ -217,7 +204,6 @@ export {
   JobPreference,
   AvailabilitySlot,
   PracticeProfile,
-  PracticeMedia,
   PracticeLocation,
   PracticeCompliance,
   PracticePayment,

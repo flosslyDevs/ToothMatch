@@ -6,7 +6,6 @@ import {
   User,
   UserFCMToken,
   Media,
-  PracticeMedia,
   Match,
 } from '../models/index.js';
 import { Op } from 'sequelize';
@@ -487,22 +486,15 @@ export async function sendMessage(req, res) {
           attributes: ['url'],
           required: false,
           where: {
-            kind: 'profile_photo',
-          },
-        },
-        {
-          model: PracticeMedia,
-          attributes: ['url'],
-          required: false,
-          where: {
-            kind: 'logo',
+            kind: {
+              [Op.in]: ['profile_photo', 'logo'],
+            },
           },
         },
       ],
     });
     const senderName = sender?.fullName || 'Someone';
-    const senderAvatar =
-      sender?.Media?.[0]?.url || sender?.PracticeMedia?.[0]?.url || null;
+    const senderAvatar = sender?.Media?.[0]?.url || null;
 
     // Find or create thread between sender and receiver
     // Get thread where both users are participants
