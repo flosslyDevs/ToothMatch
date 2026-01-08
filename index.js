@@ -19,7 +19,7 @@ import chatRouter from './api/chat.js';
 import { initializeFCM } from './utils/fcm.js';
 import { logger as loggerRoot } from './utils/logger.js';
 
-const loggerBase = loggerRoot.child({ fileContext: 'index.js' });
+const loggerBase = loggerRoot.child('index.js');
 
 const app = express();
 
@@ -61,6 +61,6 @@ const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 server.listen(port, () => {
-  const logger = loggerBase.child({ methodName: 'serverInit' });
+  const logger = loggerBase.child('server.listen.callback');
   logger.info(`Server listening on port ${port}`);
 });
