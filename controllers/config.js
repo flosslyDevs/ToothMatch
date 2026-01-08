@@ -1,7 +1,13 @@
 // Configuration data for the application
 // This includes all static data that Flutter needs on startup
 
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/config.js');
+
 export async function getConfig() {
+  const logger = loggerBase.child('getConfig');
+  logger.debug('Fetching configuration');
   return {
     status: 200,
     body: {

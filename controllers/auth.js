@@ -10,6 +10,9 @@ import { signUserToken } from '../utils/jwt.js';
 import { OAuth2Client } from 'google-auth-library';
 import appleSignin from 'apple-signin-auth';
 import { Op } from 'sequelize';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/auth.js');
 
 function getBody(event) {
   return event?.body || event?.req?.body || {};
@@ -25,6 +28,8 @@ const deviceTypes = ['ios', 'android', 'web', 'other'];
  * @param {string} deviceType - Device type (optional)
  */
 async function updateFCMTokenForUser(userId, fcmToken, deviceId, deviceType) {
+  const logger = loggerBase.child('updateFCMTokenForUser');
+
   if (!fcmToken) {
     throw new Error('FCM token is required');
   }
@@ -51,8 +56,8 @@ async function updateFCMTokenForUser(userId, fcmToken, deviceId, deviceType) {
       if (existingToken.userId !== userId) {
         // Token belongs to different user - delete old token and create new one
         // This prevents token hijacking and ensures proper ownership
-        console.log(
-          `[updateFCMToken] Token belongs to different user, reassigning to ${userId}`
+        logger.info(
+          `Token belongs to different user, reassigning to ${userId}`
         );
         await existingToken.destroy();
         token = await UserFCMToken.create({
@@ -95,33 +100,31 @@ async function updateFCMTokenForUser(userId, fcmToken, deviceId, deviceType) {
         },
       });
       if (deletedCount > 0) {
-        console.log(
-          `[updateFCMToken] Removed ${deletedCount} old token(s) for user ${userId} on device ${deviceId}`
+        logger.info(
+          `Removed ${deletedCount} old token(s) for user ${userId} on device ${deviceId}`
         );
       }
     }
 
     const deviceInfo = deviceId ? ` (device: ${deviceId})` : '';
-    console.log(
-      `[updateFCMToken] ${action} FCM token for user ${userId}${deviceInfo}`
-    );
+    logger.info(`${action} FCM token for user ${userId}${deviceInfo}`);
   } catch (error) {
     // Log error but don't fail login if FCM token update fails
-    console.error(
-      `[updateFCMToken] Error updating FCM token for userId=${userId}. Error:`,
-      error
-    );
+    logger.error(`Error updating FCM token for userId=${userId}`, error);
   }
 }
 
 export async function signupRequest(event) {
+  const logger = loggerBase.child('signupRequest');
   const { email, fullName, mobileNumber, password, role } = getBody(event);
   if (!email || !fullName || !password) {
+    logger.warn('Signup failed - missing required fields');
     return { status: 400, body: { message: 'Missing required fields' } };
   }
   try {
     const existing = await User.findOne({ where: { email } });
     if (existing) {
+      logger.warn('Signup failed - email already registered', { email });
       return { status: 409, body: { message: 'Email already registered' } };
     }
     const passwordHash = await bcrypt.hash(password, 10);
@@ -145,9 +148,12 @@ export async function signupRequest(event) {
       emailError =
         err?.message || err?.originalError || 'Email service unavailable';
       // Do not block signup on email failure
-      // eslint-disable-next-line no-console
-      console.error('Signup email send failed:', emailError);
+      logger.warn('Email verification failed to send', {
+        userId: user.id,
+        error: emailError,
+      });
     }
+    logger.info('User signup successful', { userId: user.id, role: user.role });
     return {
       status: 201,
       body: {
@@ -159,6 +165,11 @@ export async function signupRequest(event) {
       },
     };
   } catch (error) {
+    logger.error(
+      'Signup failed',
+      { email, error: error?.message || String(error) },
+      error
+    );
     return {
       status: 500,
       body: {
@@ -170,25 +181,31 @@ export async function signupRequest(event) {
 }
 
 export async function verifyEmail(event) {
+  const logger = loggerBase.child('verifyEmail');
   const { email, code } = getBody(event);
   const user = await User.findOne({ where: { email } });
   if (!user || user.verificationCode !== code) {
+    logger.warn('Email verification failed - invalid code');
     return { status: 400, body: { message: 'Invalid code' } };
   }
   user.isEmailVerified = true;
   user.verificationCode = null;
   await user.save();
+  logger.debug('Email verification successful', { userId: user.id });
   return { status: 200, body: { message: 'Email verified' } };
 }
 
 export async function login(event) {
+  const logger = loggerBase.child('login');
   const { email, password, fcmToken, deviceId, deviceType } = getBody(event);
   const user = await User.findOne({ where: { email } });
   if (!user) {
+    logger.warn('Login failed - user not found');
     return { status: 401, body: { message: 'Invalid credentials' } };
   }
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) {
+    logger.warn('Login failed - invalid password', { userId: user.id });
     return { status: 401, body: { message: 'Invalid credentials' } };
   }
 
@@ -197,6 +214,10 @@ export async function login(event) {
     try {
       await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
     } catch (error) {
+      logger.error('FCM token update failed during login', {
+        userId: user.id,
+        error: error.message,
+      });
       return { status: 401, body: { message: error.message } };
     }
   }
@@ -216,6 +237,7 @@ export async function login(event) {
   }
 
   const token = signUserToken(user);
+  logger.info('Login successful', { userId: user.id, role: user.role });
   return {
     status: 200,
     body: {
@@ -228,6 +250,7 @@ export async function login(event) {
 
 // Google OAuth signup/login
 export async function googleAuth(event) {
+  const logger = loggerBase.child('googleAuth');
   const {
     idToken,
     fullName,
@@ -237,11 +260,15 @@ export async function googleAuth(event) {
     deviceId,
     deviceType,
   } = getBody(event);
-  if (!idToken) return { status: 400, body: { message: 'Missing idToken' } };
+  if (!idToken) {
+    logger.warn('Google auth failed - missing idToken');
+    return { status: 400, body: { message: 'Missing idToken' } };
+  }
 
   // Validate that idToken looks like a JWT (should have 3 segments separated by dots)
   const tokenSegments = idToken.split('.');
   if (tokenSegments.length !== 3) {
+    logger.warn('Google auth failed - invalid JWT format');
     return {
       status: 400,
       body: {
@@ -259,6 +286,7 @@ export async function googleAuth(event) {
     const payload = ticket.getPayload();
     const email = payload.email;
     const sub = payload.sub;
+    logger.debug('Google token verified successfully', { sub });
     let user = await User.findOne({
       where: { oauthProvider: 'google', oauthSubject: sub },
     });
@@ -275,11 +303,18 @@ export async function googleAuth(event) {
         oauthSubject: sub,
         role: role === 'practice' ? 'practice' : 'candidate',
       });
+      logger.info('New user created via Google OAuth', {
+        userId: user.id,
+        role: user.role,
+      });
     } else {
       user.oauthProvider = 'google';
       user.oauthSubject = sub;
       if (!user.isEmailVerified) user.isEmailVerified = true;
       await user.save();
+      logger.info('Existing user updated with Google OAuth', {
+        userId: user.id,
+      });
     }
 
     // Update FCM token if provided
@@ -287,6 +322,11 @@ export async function googleAuth(event) {
       try {
         await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
       } catch (error) {
+        logger.error(
+          'FCM token update failed during Google auth',
+          { userId: user.id, error: error.message },
+          error
+        );
         return { status: 401, body: { message: error.message } };
       }
     }
@@ -306,6 +346,7 @@ export async function googleAuth(event) {
     }
 
     const token = signUserToken(user);
+    logger.info('Google auth successful', { userId: user.id, role: user.role });
     return {
       status: 200,
       body: {
@@ -317,6 +358,7 @@ export async function googleAuth(event) {
   } catch (error) {
     // Handle JWT verification errors
     if (error.message && error.message.includes('Wrong number of segments')) {
+      logger.warn('Google auth failed - invalid JWT format');
       return {
         status: 400,
         body: {
@@ -327,6 +369,11 @@ export async function googleAuth(event) {
         },
       };
     }
+    logger.error(
+      'Google authentication failed',
+      { error: error.message },
+      error
+    );
     return {
       status: 401,
       body: {
@@ -339,6 +386,8 @@ export async function googleAuth(event) {
 
 // Apple OAuth signup/login
 export async function appleAuth(event) {
+  const logger = loggerBase.child('appleAuth');
+  logger.debug('Received event for Apple login/signup');
   const {
     idToken,
     fullName,
@@ -348,20 +397,32 @@ export async function appleAuth(event) {
     deviceId,
     deviceType,
   } = getBody(event);
-  if (!idToken) return { status: 400, body: { message: 'Missing idToken' } };
+
+  if (!idToken) {
+    logger.warn('Missing idToken');
+    return { status: 400, body: { message: 'Missing idToken' } };
+  }
+
+  logger.debug('Verifying idToken with Apple');
   const payload = await appleSignin.verifyIdToken(idToken, {
     audience: process.env.APPLE_CLIENT_ID,
     ignoreExpiration: false,
   });
+
   const email = payload.email;
   const sub = payload.sub;
+  logger.debug(`Apple idToken verified`, { sub });
+
   let user = await User.findOne({
     where: { oauthProvider: 'apple', oauthSubject: sub },
   });
+
   if (!user && email) {
+    logger.debug('No user found by sub, searching by email');
     user = await User.findOne({ where: { email } });
   }
   if (!user) {
+    logger.info(`Creating new user for Apple OAuth`, { role });
     user = await User.create({
       email,
       fullName: fullName || email || 'Apple User',
@@ -372,6 +433,7 @@ export async function appleAuth(event) {
       role: role === 'practice' ? 'practice' : 'candidate',
     });
   } else {
+    logger.info(`Updating existing user with Apple OAuth`, { userId: user.id });
     user.oauthProvider = 'apple';
     user.oauthSubject = sub;
     if (!user.isEmailVerified) user.isEmailVerified = true;
@@ -381,8 +443,13 @@ export async function appleAuth(event) {
   // Update FCM token if provided
   if (fcmToken) {
     try {
+      logger.debug(`Updating FCM token for user`, { userId: user.id });
       await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
     } catch (error) {
+      logger.error(`FCM token update failed`, {
+        userId: user.id,
+        error: error.message,
+      });
       return { status: 401, body: { message: error.message } };
     }
   }
@@ -390,11 +457,13 @@ export async function appleAuth(event) {
   // Check if profile is complete
   let isProfileComplete = false;
   if (user.role === 'candidate') {
+    logger.debug(`Checking candidate profile`, { userId: user.id });
     const profile = await CandidateProfile.findOne({
       where: { userId: user.id },
     });
     isProfileComplete = profile?.profileCompletion === true;
   } else if (user.role === 'practice') {
+    logger.debug(`Checking practice profile`, { userId: user.id });
     const profile = await PracticeProfile.findOne({
       where: { userId: user.id },
     });
@@ -402,6 +471,10 @@ export async function appleAuth(event) {
   }
 
   const token = signUserToken(user);
+  logger.info(`Apple auth process complete`, {
+    userId: user.id,
+    role: user.role,
+  });
   return {
     status: 200,
     body: {
@@ -413,13 +486,16 @@ export async function appleAuth(event) {
 }
 
 export async function forgetPasswordRequest(event) {
+  const logger = loggerBase.child('forgetPasswordRequest');
   const { email } = getBody(event);
   if (!email) {
+    logger.warn('Password reset request failed - email missing');
     return { status: 400, body: { message: 'Email is required' } };
   }
   try {
     const user = await User.findOne({ where: { email } });
     if (!user) {
+      logger.warn('Password reset request failed - user not found', { email });
       return { status: 404, body: { message: 'User not found' } };
     }
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -433,9 +509,12 @@ export async function forgetPasswordRequest(event) {
       emailSendFailed = true;
       emailError =
         err?.message || err?.originalError || 'Email service unavailable';
-      // eslint-disable-next-line no-console
-      console.error('Forgot password email send failed:', emailError);
+      logger.warn('Password reset email failed to send', {
+        userId: user.id,
+        error: emailError,
+      });
     }
+    logger.info('Password reset code generated', { userId: user.id });
     return {
       status: 200,
       body: {
@@ -445,6 +524,11 @@ export async function forgetPasswordRequest(event) {
       },
     };
   } catch (error) {
+    logger.error(
+      'Password reset request failed',
+      { email, error: error?.message || String(error) },
+      error
+    );
     return {
       status: 500,
       body: {
@@ -456,27 +540,41 @@ export async function forgetPasswordRequest(event) {
 }
 
 export async function resetPassword(event) {
+  const logger = loggerBase.child('resetPassword');
   const { email, code, newPassword } = getBody(event);
   if (!email || !code || !newPassword) {
+    logger.warn('Password reset failed - missing required fields');
     return { status: 400, body: { message: 'Missing required fields' } };
   }
   const user = await User.findOne({ where: { email } });
   if (!user || user.verificationCode !== code) {
+    logger.warn('Password reset failed - invalid code', { userId: user?.id });
     return { status: 400, body: { message: 'Invalid reset code' } };
   }
-  const passwordHash = await bcrypt.hash(newPassword, 10);
-  user.passwordHash = passwordHash;
-  user.verificationCode = null;
-  await user.save();
-  return { status: 200, body: { message: 'Password reset successfully' } };
+  try {
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    user.passwordHash = passwordHash;
+    user.verificationCode = null;
+    await user.save();
+    logger.info('Password reset successful', { userId: user.id });
+    return { status: 200, body: { message: 'Password reset successfully' } };
+  } catch (error) {
+    logger.error(
+      'Password reset failed',
+      { userId: user.id, error: error.message },
+      error
+    );
+    return { status: 500, body: { message: 'Unable to reset password' } };
+  }
 }
 export async function logout(req, res) {
+  const logger = loggerBase.child('logout');
   const { fcmToken, deviceId } = req.body;
   const userId = req.user.sub;
 
   // Verify user ID is present
   if (!userId) {
-    console.error('[logout] User ID is required');
+    logger.error('User ID is required');
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
@@ -486,21 +584,22 @@ export async function logout(req, res) {
       const destroyed = await UserFCMToken.destroy({
         where: { userId, fcmToken },
       });
-      console.log('[logout] FCM token destroyed:', destroyed);
+      logger.info('FCM token destroyed', { count: destroyed });
     } catch (error) {
-      console.error('[logout] Error destroying FCM token By FCMToken:', error);
+      logger.error('Error destroying FCM token by token', {
+        error: error.message,
+      });
     }
   } else if (deviceId) {
     try {
       const destroyed = await UserFCMToken.destroy({
         where: { userId, deviceId },
       });
-      console.log('[logout] Device FCM token destroyed:', destroyed);
+      logger.info('Device FCM token destroyed', { count: destroyed });
     } catch (error) {
-      console.error(
-        '[logout] Error destroying device FCM token By DeviceID:',
-        error
-      );
+      logger.error('Error destroying device FCM token by deviceId', {
+        error: error.message,
+      });
     }
   }
 
@@ -508,16 +607,22 @@ export async function logout(req, res) {
 }
 
 export async function resendOtp(event) {
+  const logger = loggerBase.child('resendOtp');
   const { email } = getBody(event);
   if (!email) {
+    logger.warn('OTP resend failed - email missing');
     return { status: 400, body: { message: 'Email is required' } };
   }
   try {
     const user = await User.findOne({ where: { email } });
     if (!user) {
+      logger.warn('OTP resend failed - user not found', { email });
       return { status: 404, body: { message: 'User not found' } };
     }
     if (user.isEmailVerified) {
+      logger.warn('OTP resend failed - email already verified', {
+        userId: user.id,
+      });
       return { status: 400, body: { message: 'Email is already verified' } };
     }
     // Generate new verification code
@@ -534,9 +639,12 @@ export async function resendOtp(event) {
       emailSendFailed = true;
       emailError =
         err?.message || err?.originalError || 'Email service unavailable';
-      // eslint-disable-next-line no-console
-      console.error('Resend OTP email send failed:', emailError);
+      logger.warn('OTP resend email failed to send', {
+        userId: user.id,
+        error: emailError,
+      });
     }
+    logger.info('OTP resend successful', { userId: user.id });
     return {
       status: 200,
       body: {
@@ -546,6 +654,11 @@ export async function resendOtp(event) {
       },
     };
   } catch (error) {
+    logger.error(
+      'OTP resend failed',
+      { email, error: error?.message || String(error) },
+      error
+    );
     return {
       status: 500,
       body: {

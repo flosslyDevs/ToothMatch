@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import { logger as loggerRoot } from './logger.js';
+const loggerBase = loggerRoot.child('utils/email.js');
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
@@ -13,10 +15,12 @@ const transporter = nodemailer.createTransport({
 });
 
 export async function sendVerificationEmail(to, code) {
+  const logger = loggerBase.child('sendVerificationEmail');
+  logger.debug('Sending verification email', { to, code });
   // If no SMTP configured, just log the code
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
-    console.log(`\n📧 Verification code for ${to}: ${code}\n`);
-    return { messageId: 'console-log' };
+    logger.warn(`No SMTP configured, skipping email send`);
+    return;
   }
 
   const mail = {
@@ -27,21 +31,22 @@ export async function sendVerificationEmail(to, code) {
     html: `<p>Your verification code is <b>${code}</b></p>`,
   };
 
+  logger.debug('Sending email', { mail });
+
   try {
-    return await transporter.sendMail(mail);
+    const res = await transporter.sendMail(mail);
+    logger.info('Email sent');
+    return res;
   } catch (error) {
-    console.log(`\n📧 Email failed, verification code for ${to}: ${code}\n`);
+    logger.error(`Email failed`, { error: error.message }, error);
 
     // Provide helpful error message for Gmail 2FA issues
     if (error.message && error.message.includes('BadCredentials')) {
       const helpfulError = new Error(
         'Gmail authentication failed. With 2FA enabled, you must use an App Password instead of your regular password. Go to: https://myaccount.google.com/apppasswords'
       );
-      helpfulError.originalError = error.message;
       helpfulError.code = 'SMTP_AUTH_FAILED';
       throw helpfulError;
     }
-
-    throw error;
   }
 }

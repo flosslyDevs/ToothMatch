@@ -12,6 +12,9 @@ import {
   Media,
 } from '../models/index.js';
 import { sendLikeNotification, getFCMTokensForUser } from '../utils/fcm.js';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/match.js');
 
 function normalizeStr(s) {
   return (s || '').toString().trim().toLowerCase();
@@ -36,8 +39,8 @@ function scoreCandidateToJob(candidate, job, jobType) {
   // jobType / working pattern match (20)
   const jtMatch =
     pref.jobType &&
-      job.jobType &&
-      normalizeStr(pref.jobType) === normalizeStr(job.jobType)
+    job.jobType &&
+    normalizeStr(pref.jobType) === normalizeStr(job.jobType)
       ? 1
       : 0;
   score += jtMatch * 10;
@@ -83,6 +86,7 @@ function scoreCandidateToJob(candidate, job, jobType) {
 }
 
 async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
+  const logger = loggerBase.child('ensureMatchIfMutual');
   // If actor is candidate liking job: candidateUserId=actor, practiceUserId=job.userId
   // If actor is practice liking candidate: candidateUserId=targetId, practiceUserId=actor
   if (targetType === 'candidate') {
@@ -90,9 +94,10 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
     const practiceUserId = actorUserId;
 
     try {
-      const candidateProfile = await CandidateProfile.findByPk(candidateProfileId);
+      const candidateProfile =
+        await CandidateProfile.findByPk(candidateProfileId);
       if (!candidateProfile) {
-        console.log(`[ensureMatchIfMutual] Candidate profile not found, returning null`);
+        logger.debug('Candidate profile not found, returning null');
         return null;
       }
       const candidateUserId = candidateProfile.userId;
@@ -105,17 +110,13 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
         },
       });
 
-      console.log(
-        `[ensureMatchIfMutual] Practice ${practiceUserId} liking candidate ${candidateUserId}`
+      logger.info(
+        `Practice ${practiceUserId} liking candidate ${candidateUserId}`
       );
-      console.log(
-        `[ensureMatchIfMutual] Candidate has liked ${candidateLikes.length} jobs`
-      );
+      logger.info(`Candidate has liked ${candidateLikes.length} jobs`);
 
       if (candidateLikes.length === 0) {
-        console.log(
-          `[ensureMatchIfMutual] No jobs liked by candidate, returning null`
-        );
+        logger.info(`No jobs liked by candidate, returning null`);
         return null;
       }
 
@@ -127,11 +128,8 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
         .filter((l) => l.targetType === 'permanent')
         .map((l) => l.targetId);
 
-      console.log(`[ensureMatchIfMutual] Locum target IDs:`, locumTargetIds);
-      console.log(
-        `[ensureMatchIfMutual] Permanent target IDs:`,
-        permanentTargetIds
-      );
+      logger.info(`Locum target IDs:`, locumTargetIds);
+      logger.info(`Permanent target IDs:`, permanentTargetIds);
 
       // Find matching jobs (jobs from this practice that candidate liked) with PracticeProfile included
       const matchingJobs = [];
@@ -143,8 +141,8 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
             id: { [Op.in]: locumTargetIds },
           },
         });
-        console.log(
-          `[ensureMatchIfMutual] All liked locum jobs found:`,
+        logger.info(
+          `All liked locum jobs found:`,
           allLikedLocumJobs.map((j) => ({ id: j.id, userId: j.userId }))
         );
 
@@ -161,8 +159,8 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
             },
           ],
         });
-        console.log(
-          `[ensureMatchIfMutual] Found ${locumJobs.length} locum jobs from this practice (userId: ${practiceUserId})`
+        logger.info(
+          `Found ${locumJobs.length} locum jobs from this practice (userId: ${practiceUserId})`
         );
 
         // Also check what jobs this practice actually has
@@ -170,8 +168,8 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
           where: { userId: practiceUserId },
           attributes: ['id', 'userId'],
         });
-        console.log(
-          `[ensureMatchIfMutual] All locum jobs for this practice:`,
+        logger.info(
+          `All locum jobs for this practice:`,
           practiceLocumJobs.map((j) => ({ id: j.id, userId: j.userId }))
         );
 
@@ -187,8 +185,8 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
             id: { [Op.in]: permanentTargetIds },
           },
         });
-        console.log(
-          `[ensureMatchIfMutual] All liked permanent jobs found:`,
+        logger.info(
+          `All liked permanent jobs found:`,
           allLikedPermanentJobs.map((j) => ({ id: j.id, userId: j.userId }))
         );
 
@@ -204,8 +202,8 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
             },
           ],
         });
-        console.log(
-          `[ensureMatchIfMutual] Found ${permanentJobs.length} permanent jobs from this practice (userId: ${practiceUserId})`
+        logger.info(
+          `Found ${permanentJobs.length} permanent jobs from this practice (userId: ${practiceUserId})`
         );
 
         // Also check what jobs this practice actually has
@@ -213,8 +211,8 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
           where: { userId: practiceUserId },
           attributes: ['id', 'userId'],
         });
-        console.log(
-          `[ensureMatchIfMutual] All permanent jobs for this practice:`,
+        logger.info(
+          `All permanent jobs for this practice:`,
           practicePermanentJobs.map((j) => ({ id: j.id, userId: j.userId }))
         );
 
@@ -223,14 +221,10 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
         }
       }
 
-      console.log(
-        `[ensureMatchIfMutual] Total matching jobs: ${matchingJobs.length}`
-      );
+      logger.info(`Total matching jobs: ${matchingJobs.length}`);
 
       if (matchingJobs.length === 0) {
-        console.log(
-          `[ensureMatchIfMutual] No matching jobs found, returning null`
-        );
+        logger.info(`No matching jobs found, returning null`);
         return null;
       }
 
@@ -244,9 +238,7 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
       });
 
       if (!candidate) {
-        console.log(
-          `[ensureMatchIfMutual] Candidate profile not found, returning null`
-        );
+        logger.info(`Candidate profile not found, returning null`);
         return null;
       }
 
@@ -265,17 +257,13 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
           },
         });
         if (existing) {
-          console.log(
-            `[ensureMatchIfMutual] Match already exists for job ${jobId}`
-          );
+          logger.info(`Match already exists for job ${jobId}`);
           if (!firstMatch) firstMatch = existing;
           continue;
         }
 
         const score = scoreCandidateToJob(candidate, job, jobType);
-        console.log(
-          `[ensureMatchIfMutual] Creating match for job ${jobId} with score ${score}`
-        );
+        logger.info(`Creating match for job ${jobId} with score ${score}`);
         const match = await Match.create({
           candidateUserId,
           practiceUserId,
@@ -286,10 +274,10 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
         if (!firstMatch) firstMatch = match;
       }
 
-      console.log(`[ensureMatchIfMutual] Returning match:`, firstMatch?.id);
+      logger.info(`Returning match:`, firstMatch?.id);
       return firstMatch;
     } catch (error) {
-      console.error('[ensureMatchIfMutual] Error:', error);
+      logger.error('Error:', error);
       throw error;
     }
   } else {
@@ -350,12 +338,17 @@ async function ensureMatchIfMutual(actorUserId, targetType, targetId) {
 }
 
 export async function likeTarget(req, res) {
+  const logger = loggerBase.child('likeTarget');
   const actorUserId = req.user.sub;
   const { targetType, targetId, decision } = req.body; // targetType: 'locum'|'permanent'|'candidate'; decision: 'like'|'pass'
-  if (!['locum', 'permanent', 'candidate'].includes(targetType))
+  if (!['locum', 'permanent', 'candidate'].includes(targetType)) {
+    logger.warn('Invalid targetType provided', { targetType });
     return res.status(400).json({ message: 'invalid targetType' });
-  if (!['like', 'pass'].includes(decision))
+  }
+  if (!['like', 'pass'].includes(decision)) {
+    logger.warn('Invalid decision provided', { decision });
     return res.status(400).json({ message: 'invalid decision' });
+  }
   try {
     const like = await MatchLike.create({
       actorUserId,
@@ -363,9 +356,19 @@ export async function likeTarget(req, res) {
       targetId,
       decision,
     });
+    logger.debug(`${decision} recorded`, { actorUserId, targetType, targetId });
+
     let match = null;
     if (decision === 'like') {
       match = await ensureMatchIfMutual(actorUserId, targetType, targetId);
+      if (match) {
+        logger.info('Match created', {
+          matchId: match.id,
+          actorUserId,
+          targetType,
+          targetId,
+        });
+      }
 
       // Send FCM notification to the recipient
       try {
@@ -429,7 +432,9 @@ export async function likeTarget(req, res) {
         }
       } catch (notificationError) {
         // Log error but don't fail the request
-        console.error('Error sending FCM notification:', notificationError);
+        logger.error('FCM notification failed', {
+          error: notificationError.message,
+        });
       }
     }
 
@@ -467,7 +472,9 @@ export async function likeTarget(req, res) {
       }
     } catch (targetInfoError) {
       // Log error but don't fail the request
-      console.error('Error fetching target info:', targetInfoError);
+      logger.error('Error fetching target info', {
+        error: targetInfoError.message,
+      });
     }
 
     return res.status(201).json({ like, match, target: targetInfo });
@@ -477,8 +484,10 @@ export async function likeTarget(req, res) {
 }
 
 export async function getMatches(req, res) {
+  const logger = loggerBase.child('getMatches');
   const userId = req.user?.sub;
   if (!userId) {
+    logger.warn('Unauthenticated request');
     return res.status(401).json({ message: 'User not authenticated' });
   }
   const { page = 1, limit = 10 } = req.query;
@@ -552,7 +561,7 @@ export async function getMatches(req, res) {
       },
     });
   } catch (error) {
-    console.error('Error in getMatches:', error);
+    logger.error('Error retrieving matches', { error: error.message });
     return res
       .status(500)
       .json({ message: error.message || 'Internal server error' });

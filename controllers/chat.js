@@ -11,6 +11,9 @@ import {
 } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sendChatNotification } from '../utils/fcm.js';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/chat.js');
 
 /**
  * Get chat history between the authenticated user and a recipient
@@ -28,13 +31,17 @@ import { sendChatNotification } from '../utils/fcm.js';
  * When beforeMessageId is provided, returns messages older than that message
  */
 export async function getChatHistory(req, res) {
+  const logger = loggerBase.child('getChatHistory');
   try {
     const userId = req.user.sub; // Authenticated user ID from JWT
     const { threadId, receiverId, beforeMessageId } = req.query;
 
-    console.log(
-      `[getChatHistory] userId: ${userId}, threadId: ${threadId}, receiverId: ${receiverId}, beforeMessageId: ${beforeMessageId}`
-    );
+    logger.debug('Fetching chat history', {
+      userId,
+      threadId,
+      receiverId,
+      beforeMessageId,
+    });
 
     const messageLimit = 10;
     let resolvedThreadId = null;
@@ -63,9 +70,7 @@ export async function getChatHistory(req, res) {
     } else {
       // Fall back to finding thread by receiverId
       if (!receiverId) {
-        console.warn(
-          `[getChatHistory] Missing both threadId and receiverId param from userId: ${userId}`
-        );
+        logger.warn('Missing both threadId and receiverId', { userId });
         return res.status(400).json({
           message: 'Either threadId or receiverId is required',
         });
@@ -119,17 +124,19 @@ export async function getChatHistory(req, res) {
       });
 
       if (!cursorMessage) {
-        console.warn(
-          `[getChatHistory] Cursor message not found or does not belong to this thread. userId=${userId}, threadId=${resolvedThreadId}, beforeMessageId=${beforeMessageId}`
-        );
+        logger.warn('Cursor message not found or does not belong to thread', {
+          userId,
+          threadId: resolvedThreadId,
+          beforeMessageId,
+        });
         return res.status(404).json({
           message: 'Message not found or does not belong to this conversation',
         });
       }
 
-      console.log(
-        `[getChatHistory] Found cursorMessage with createdAt: ${cursorMessage.createdAt}`
-      );
+      logger.debug('Found cursor message', {
+        createdAt: cursorMessage.createdAt,
+      });
       // Fetch messages older than the cursor message
       whereClause.createdAt = {
         [Op.lt]: cursorMessage.createdAt,
@@ -145,9 +152,11 @@ export async function getChatHistory(req, res) {
       attributes: ['id', 'senderId', 'message', 'createdAt'],
     });
 
-    console.log(
-      `[getChatHistory] Fetched ${messages.length} messages for userId=${userId}, threadId=${resolvedThreadId}.`
-    );
+    logger.debug('Fetched messages', {
+      count: messages.length,
+      userId,
+      threadId: resolvedThreadId,
+    });
 
     // Determine if there are more messages to load
     let remaining = 0;
@@ -166,13 +175,13 @@ export async function getChatHistory(req, res) {
       remaining = await ChatMessage.count({
         where: olderWhereClause,
       });
-      console.log(
-        `[getChatHistory] Remaining older messages count: ${remaining}`
-      );
+      logger.debug('Remaining messages count', { remaining });
     } else {
-      console.log(
-        `[getChatHistory] No messages found for userId=${userId}, threadId=${resolvedThreadId} with params beforeMessageId=${beforeMessageId}.`
-      );
+      logger.debug('No messages found', {
+        userId,
+        threadId: resolvedThreadId,
+        beforeMessageId,
+      });
     }
 
     return res.status(200).json({
@@ -182,8 +191,9 @@ export async function getChatHistory(req, res) {
       },
     });
   } catch (error) {
-    console.error(
-      `[getChatHistory] Error fetching chat history for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error fetching chat history',
+      { userId: req?.user?.sub, error: error.message },
       error
     );
     return res.status(500).json({
@@ -202,19 +212,18 @@ export async function getChatHistory(req, res) {
  * Returns chats list with the latest message data
  */
 export async function getChats(req, res) {
+  const logger = loggerBase.child('getChats');
   const userId = req.user.sub;
-  console.log(`[getChats] Called by userId=${userId}`);
+  logger.debug('Fetching chats', { userId });
 
   if (!userId) {
-    console.warn(`[getChats] No userId found in request`);
+    logger.warn('No userId found in request');
     return res.status(401).json({ message: 'User not authenticated' });
   }
 
   try {
     // Optimized: Get all threads where user is a participant with latest messages in one query
-    console.log(
-      `[getChats] Fetching chat thread participants for userId=${userId}`
-    );
+    logger.debug('Fetching chat thread participants', { userId });
     const userParticipants = await ChatThreadParticipant.findAll({
       where: { userId },
       include: [
@@ -259,14 +268,16 @@ export async function getChats(req, res) {
       ],
     });
 
-    console.log(
-      `[getChats] Found ${userParticipants.length} chat threads for userId=${userId}`
-    );
+    logger.debug('Found chat threads', {
+      count: userParticipants.length,
+      userId,
+    });
 
     // Avatar map for other users
     const avatarMap = new Map();
     for (const participant of userParticipants) {
-      const otherParticipant = participant.ChatThread?.ChatThreadParticipants?.[0];
+      const otherParticipant =
+        participant.ChatThread?.ChatThreadParticipants?.[0];
       if (!otherParticipant) {
         continue;
       }
@@ -281,9 +292,9 @@ export async function getChats(req, res) {
     for (const participant of userParticipants) {
       const thread = participant.ChatThread;
       if (!thread) {
-        console.warn(
-          `[getChats] ChatThread missing for participantId=${participant.id}`
-        );
+        logger.warn('ChatThread missing for participant', {
+          participantId: participant.id,
+        });
         continue;
       }
 
@@ -292,9 +303,9 @@ export async function getChats(req, res) {
       const otherParticipant = thread.ChatThreadParticipants?.[0];
 
       if (!otherParticipant) {
-        console.warn(
-          `[getChats] No other participant found for threadId=${thread.id}`
-        );
+        logger.warn('No other participant found for thread', {
+          threadId: thread.id,
+        });
         continue;
       }
 
@@ -304,9 +315,7 @@ export async function getChats(req, res) {
       const otherUserData = {
         id: otherUserId,
         name: otherUser?.fullName || null,
-        avatar:
-          avatarMap.get(otherUserId) ||
-          null
+        avatar: avatarMap.get(otherUserId) || null,
       };
 
       chatsData.push({
@@ -315,30 +324,32 @@ export async function getChats(req, res) {
         timestamp: latestMessage?.createdAt ?? thread.createdAt,
         message: latestMessage
           ? {
-            id: latestMessage.id,
-            senderId: latestMessage.senderId,
-            message: latestMessage.message,
-          }
+              id: latestMessage.id,
+              senderId: latestMessage.senderId,
+              message: latestMessage.message,
+            }
           : {
-            senderId: null,
-            message: 'You started a new conversation',
-          },
+              senderId: null,
+              message: 'You started a new conversation',
+            },
         lastReadAt: participant.lastReadAt,
         muted: participant.muted,
         archived: participant.archived,
       });
     }
 
-    console.log(
-      `[getChats] Returning ${chatsData.length} chats for userId=${userId}`
-    );
+    logger.debug('Returning chats', { count: chatsData.length, userId });
     return res.status(200).json({
       chats: chatsData.sort(
         (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
       ),
     });
   } catch (error) {
-    console.error('Error fetching chats:', error);
+    logger.error(
+      'Error fetching chats',
+      { userId, error: error.message },
+      error
+    );
     return res
       .status(500)
       .json({ message: error.message || 'Internal server error' });
@@ -359,13 +370,16 @@ export async function getChats(req, res) {
  * Returns the created message and FCM send status
  */
 export async function sendMessage(req, res) {
+  const logger = loggerBase.child('sendMessage');
   try {
     const senderId = req.user.sub; // Authenticated user ID from JWT
     const { receiverId, message } = req.body;
 
-    console.log(
-      `[sendMessage] senderId: ${senderId}, receiverId: ${receiverId}, message length: ${message?.length}`
-    );
+    logger.debug('Sending message', {
+      senderId,
+      receiverId,
+      messageLength: message?.length,
+    });
 
     // Validate required fields
     if (!message || !receiverId) {
@@ -596,10 +610,10 @@ export async function sendMessage(req, res) {
           }
         } else {
           fcmResults.failed++;
-          console.error(
-            `[sendMessage] FCM promise rejected for token ${receiverTokens[index].id}:`,
-            result.reason
-          );
+          logger.warn('FCM promise rejected', {
+            tokenId: receiverTokens[index].id,
+            error: result.reason?.message || result.reason,
+          });
         }
       });
 
@@ -616,14 +630,13 @@ export async function sendMessage(req, res) {
         await UserFCMToken.destroy({
           where: { id: { [Op.in]: invalidTokenIds } },
         });
-        console.log(
-          `[sendMessage] Removed ${invalidTokenIds.length} invalid FCM tokens for user ${receiverId}`
-        );
+        logger.info('Removed invalid FCM tokens', {
+          count: invalidTokenIds.length,
+          receiverId,
+        });
       }
     } else {
-      console.log(
-        `[sendMessage] Receiver ${receiverId} has no FCM tokens, skipping notification`
-      );
+      logger.debug('Receiver has no FCM tokens', { receiverId });
     }
 
     return res.status(201).json({
@@ -636,8 +649,9 @@ export async function sendMessage(req, res) {
       },
     });
   } catch (error) {
-    console.error(
-      `[sendMessage] Error sending message for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error sending message',
+      { userId: req?.user?.sub, error: error.message },
       error
     );
     return res.status(500).json({
@@ -658,9 +672,12 @@ export async function sendMessage(req, res) {
  * - threadId (required): UUID of the thread
  */
 export async function markThreadAsRead(req, res) {
+  const logger = loggerBase.child('markThreadAsRead');
+  const userId = req.user.sub;
+  const { threadId } = req.params;
+
   try {
-    const userId = req.user.sub;
-    const { threadId } = req.params;
+    logger.debug('Marking thread as read', { userId, threadId });
 
     if (!threadId) {
       return res.status(400).json({
@@ -692,8 +709,9 @@ export async function markThreadAsRead(req, res) {
       lastReadAt: participant.lastReadAt,
     });
   } catch (error) {
-    console.error(
-      `[markThreadAsRead] Error marking thread as read for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error marking thread as read',
+      { userId: req?.user?.sub, threadId, error: error.message },
       error
     );
     return res.status(500).json({
@@ -713,9 +731,11 @@ export async function markThreadAsRead(req, res) {
  * - threadId (required): UUID of the thread
  */
 export async function toggleThreadMute(req, res) {
+  const logger = loggerBase.child('toggleThreadMute');
+  const userId = req.user.sub;
+  const { threadId } = req.params;
   try {
-    const userId = req.user.sub;
-    const { threadId } = req.params;
+    logger.debug('Toggling thread mute', { userId, threadId });
 
     if (!threadId) {
       return res.status(400).json({
@@ -748,8 +768,9 @@ export async function toggleThreadMute(req, res) {
       muted: newMutedStatus,
     });
   } catch (error) {
-    console.error(
-      `[toggleThreadMute] Error toggling thread mute for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error toggling thread mute',
+      { userId: req?.user?.sub, threadId, error: error.message },
       error
     );
     return res.status(500).json({
@@ -769,9 +790,13 @@ export async function toggleThreadMute(req, res) {
  * - threadId (required): UUID of the thread
  */
 export async function toggleThreadArchive(req, res) {
+  const logger = loggerBase.child('toggleThreadArchive');
+
+  const userId = req.user.sub;
+  const { threadId } = req.params;
+
   try {
-    const userId = req.user.sub;
-    const { threadId } = req.params;
+    logger.debug('Toggling thread archive', { userId, threadId });
 
     if (!threadId) {
       return res.status(400).json({
@@ -804,8 +829,9 @@ export async function toggleThreadArchive(req, res) {
       archived: newArchivedStatus,
     });
   } catch (error) {
-    console.error(
-      `[toggleThreadArchive] Error toggling thread archive for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error toggling thread archive',
+      { userId: req?.user?.sub, threadId, error: error.message },
       error
     );
     return res.status(500).json({

@@ -4,10 +4,15 @@ import {
   PracticeLocation,
   Rating,
 } from '../models/index.js';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/practice.js');
 
 // Create a new practice profile
 export async function createPracticeProfile(req, res) {
+  const logger = loggerBase.child('createPracticeProfile');
   const userId = req.user.sub;
+  logger.debug('Creating practice profile', { userId });
   const {
     // Step 1
     clinicType,
@@ -36,12 +41,11 @@ export async function createPracticeProfile(req, res) {
       where: { userId },
     });
     if (existingProfile) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Practice profile already exists for this user. Use PUT to update.',
-        });
+      logger.warn('Practice profile already exists', { userId });
+      return res.status(400).json({
+        message:
+          'Practice profile already exists for this user. Use PUT to update.',
+      });
     }
 
     // Step 1 + 2: Create basic practice profile & brand/contact
@@ -87,21 +91,27 @@ export async function createPracticeProfile(req, res) {
     // 	await PracticeCulture.create({ ...culture, userId });
     // }
 
-    return res
-      .status(201)
-      .json({
-        message: 'Practice profile created successfully',
-        profileId: profile.id,
-        profileCompletion: true,
-      });
+    logger.info('Practice profile created', { userId, profileId: profile.id });
+    return res.status(201).json({
+      message: 'Practice profile created successfully',
+      profileId: profile.id,
+      profileCompletion: true,
+    });
   } catch (error) {
+    logger.error(
+      'Error creating practice profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Upsert all practice data in a single payload
 export async function upsertPracticeProfile(req, res) {
+  const logger = loggerBase.child('upsertPracticeProfile');
   const userId = req.user.sub;
+  logger.debug('Upserting practice profile', { userId });
   const {
     // Step 1
     clinicType,
@@ -187,17 +197,25 @@ export async function upsertPracticeProfile(req, res) {
     // 	await cul.update(culture);
     // }
 
+    logger.info('Practice profile upserted', { userId });
     return res
       .status(200)
       .json({ message: 'Practice profile saved', profileCompletion: true });
   } catch (error) {
+    logger.error(
+      'Error upserting practice profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function getPracticeProfile(req, res) {
+  const logger = loggerBase.child('getPracticeProfile');
   const userId = req.user.sub;
   try {
+    logger.debug('Fetching practice profile', { userId });
     const profile = await PracticeProfile.findOne({ where: { userId } });
     const media = await PracticeMedia.findAll({ where: { userId } });
     const locations = await PracticeLocation.findAll({ where: { userId } });
@@ -207,16 +225,24 @@ export async function getPracticeProfile(req, res) {
     // const compliance = await PracticeCompliance.findOne({ where: { userId } });
     // const payment = await PracticePayment.findOne({ where: { userId } });
     // const culture = await PracticeCulture.findOne({ where: { userId } });
+    logger.debug('Practice profile fetched', { userId });
     return res.status(200).json({ profile, media, locations, ratings });
   } catch (error) {
+    logger.error(
+      'Error fetching practice profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Get all practice profiles for a specific user
 export async function getAllUserProfiles(req, res) {
+  const logger = loggerBase.child('getAllUserProfiles');
   const { userId } = req.params;
   try {
+    logger.debug('Fetching all user profiles', { userId });
     const profiles = await PracticeProfile.findAll({
       where: { userId },
       include: [
@@ -231,16 +257,24 @@ export async function getAllUserProfiles(req, res) {
         // }
       ],
     });
+    logger.debug('User profiles fetched', { userId, count: profiles.length });
     return res.status(200).json({ profiles });
   } catch (error) {
+    logger.error(
+      'Error fetching user profiles',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Get a specific practice profile by ID (Public - for candidates to view practices)
 export async function getSpecificPractice(req, res) {
+  const logger = loggerBase.child('getSpecificPractice');
   const { practiceId } = req.params;
   try {
+    logger.debug('Fetching specific practice', { practiceId });
     // Try to find by practice profile id first
     let profile = await PracticeProfile.findByPk(practiceId, {
       include: [
@@ -272,6 +306,7 @@ export async function getSpecificPractice(req, res) {
     }
 
     if (!profile) {
+      logger.warn('Practice profile not found', { practiceId });
       return res.status(404).json({ message: 'Practice profile not found' });
     }
 
@@ -295,28 +330,42 @@ export async function getSpecificPractice(req, res) {
       logo,
     };
 
+    logger.debug('Specific practice fetched', { practiceId });
     return res.status(200).json({
       profile: profileWithLogo,
       media: practiceMedia,
       locations: profile.PracticeLocation || [],
     });
   } catch (error) {
+    logger.error(
+      'Error fetching specific practice',
+      { practiceId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function ratePractice(req, res) {
+  const logger = loggerBase.child('ratePractice');
   const { practiceId } = req.params;
   const { rating, comment } = req.body;
+  const userId = req.user.sub;
+  logger.debug('Rating practice', { userId, practiceId, rating });
   if (rating < 1 || rating > 5) {
+    logger.warn('Invalid rating value', { userId, practiceId, rating });
     return res.status(400).json({ message: 'Rating must be between 1 and 5' });
   }
   if (comment && comment.length > 500) {
+    logger.warn('Comment too long', {
+      userId,
+      practiceId,
+      commentLength: comment.length,
+    });
     return res
       .status(400)
       .json({ message: 'Comment must be less than 500 characters' });
   }
-  const userId = req.user.sub;
   try {
     const practiceRating = await Rating.create({
       profileId: practiceId,
@@ -325,10 +374,16 @@ export async function ratePractice(req, res) {
       rating,
       comment,
     });
+    logger.info('Practice rated', { userId, practiceId, rating });
     return res
       .status(200)
       .json({ message: 'Practice rated successfully', practiceRating });
   } catch (error) {
+    logger.error(
+      'Error rating practice',
+      { userId, practiceId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }

@@ -1,4 +1,7 @@
 import { Sequelize } from 'sequelize';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const logger = loggerRoot.child('services/db.js');
 
 const { DATABASE_URL, PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD } =
   process.env;
@@ -19,7 +22,7 @@ if (url) {
 } else if (PGHOST) {
   // Build from discrete env vars (PG*)
   if (!PGDATABASE || !PGUSER) {
-    console.error(
+    logger.error(
       'PGDATABASE and PGUSER must be set when using discrete PG env vars.'
     );
   } else {
@@ -32,7 +35,7 @@ if (url) {
     });
   }
 } else {
-  console.warn(
+  logger.warn(
     'No Postgres configuration found. Set DATABASE_URL (recommended) or PG* env vars.'
   );
 }
@@ -41,21 +44,21 @@ export { sequelize };
 
 export async function connectToDatabase() {
   if (!sequelize) {
-    console.warn(
+    logger.warn(
       'Skipping DB connection because no database URL is configured.'
     );
     return null;
   }
   try {
     await sequelize.authenticate();
-    console.log('Sequelize: Connection has been established successfully.');
+    logger.info('Sequelize: Connection has been established successfully.');
     // Import and sync all models
     await import('../models/index.js');
     await sequelize.sync({ alter: true });
-    console.log('Database tables synced successfully.');
+    logger.info('Database tables synced successfully.');
     return sequelize;
   } catch (error) {
-    console.error('Unable to connect to the database:', error.message);
+    logger.error('Unable to connect to the database:', error.message);
     throw error;
   }
 }

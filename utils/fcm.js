@@ -1,6 +1,9 @@
 import admin from 'firebase-admin';
 import fs from 'fs';
 import UserFCMToken from '../models/auth/userFCMToken.js';
+import { logger as loggerRoot } from './logger.js';
+
+const loggerBase = loggerRoot.child('utils/fcm.js');
 
 // Initialize Firebase Admin if not already initialized
 let fcmInitialized = false;
@@ -11,9 +14,14 @@ const notificationTypes = {
 };
 
 export const initializeFCM = () => {
+  const logger = loggerBase.child('initializeFCM');
+
   if (fcmInitialized) {
+    logger.debug('FCM already initialized');
     return true;
   }
+
+  logger.info('Initializing FCM');
 
   // Check if Firebase Admin is already initialized
   if (admin.apps.length === 0) {
@@ -25,7 +33,7 @@ export const initializeFCM = () => {
         credential: admin.credential.cert(serviceAccount),
       });
     } else {
-      console.warn(
+      logger.warn(
         'FCM not initialized: Missing FIREBASE_SERVICE_ACCOUNT_JSON_PATH'
       );
       return false;
@@ -33,7 +41,7 @@ export const initializeFCM = () => {
   }
 
   fcmInitialized = true;
-  console.log('FCM initialized successfully');
+  logger.info('FCM initialized successfully');
   return true;
 };
 
@@ -49,15 +57,20 @@ export const sendFCMNotification = async (
   notification,
   data = {}
 ) => {
+  const logger = loggerBase.child('sendFCMNotification');
+  logger.debug('Sending FCM notification', { fcmToken, notification, data });
   if (!fcmInitialized) {
+    logger.info('FCM not initialized, initializing...');
     initializeFCM();
   }
 
   if (!fcmToken) {
+    logger.debug('No FCM token provided');
     throw new Error('FCM token is required');
   }
 
   if (!admin.apps.length) {
+    logger.error('Firebase Admin not initialized');
     throw new Error('Firebase Admin not initialized');
   }
 
@@ -78,12 +91,14 @@ export const sendFCMNotification = async (
     },
   };
 
+  logger.debug('FCM message', { message });
+
   try {
     const response = await admin.messaging().send(message);
-    console.log('Successfully sent FCM message:', response);
+    logger.info('Successfully sent FCM message:', response);
     return { success: true, messageId: response };
   } catch (error) {
-    console.error('Error sending FCM message:', error);
+    logger.error('Error sending FCM message:', error);
 
     // Handle invalid token errors
     if (
@@ -111,6 +126,14 @@ export const sendChatNotification = async (
   senderName,
   senderAvatar
 ) => {
+  const logger = loggerBase.child('sendChatNotification');
+  logger.debug('Sending chat notification', {
+    fcmToken,
+    messageData,
+    senderName,
+    senderAvatar,
+  });
+
   // Ensure all data values are strings (FCM requirement)
   const data = {
     type: notificationTypes.chat,
@@ -122,7 +145,9 @@ export const sendChatNotification = async (
     timestamp: new Date(messageData.createdAt).toISOString(),
   };
 
-  return sendFCMNotification(
+  logger.debug('Chat notification data', { data });
+
+  const res = await sendFCMNotification(
     fcmToken,
     {
       title: data.senderName || 'New Message',
@@ -131,6 +156,10 @@ export const sendChatNotification = async (
     },
     data
   );
+
+  logger.debug('Chat notification result', { res });
+  logger.info('Chat notification sent');
+  return res;
 };
 
 /**
@@ -147,12 +176,22 @@ export const sendLikeNotification = async (
   senderName,
   senderAvatar
 ) => {
+  const logger = loggerBase.child('sendLikeNotification');
+  logger.debug('Sending like notification', {
+    fcmToken,
+    messageData,
+    senderName,
+    senderAvatar,
+  });
+
   const data = {
     type: notificationTypes.like,
     likerId: String(messageData.likerId),
     likerType: String(messageData.likerType),
   };
-  return sendFCMNotification(
+
+  logger.debug('Like notification data', { data });
+  const res = await sendFCMNotification(
     fcmToken,
     {
       title: 'New Like',
@@ -161,6 +200,9 @@ export const sendLikeNotification = async (
     },
     data
   );
+  logger.debug('Like notification result', { res });
+  logger.info('Like notification sent');
+  return res;
 };
 
 /**
@@ -169,11 +211,16 @@ export const sendLikeNotification = async (
  * @returns {Promise<string[]>} The FCM tokens of the user
  */
 export const getFCMTokensForUser = async (userId) => {
+  const logger = loggerBase.child('getFCMTokensForUser');
+  logger.info('Getting FCM tokens for user', { userId });
   try {
     const tokens = await UserFCMToken.findAll({ where: { userId } });
-    return tokens.map((token) => token.fcmToken);
+    logger.debug('FCM tokens found', { count: tokens.length });
+    const fcmTokens = tokens.map((token) => token.fcmToken);
+    logger.info('FCM tokens found', { count: fcmTokens.length });
+    return fcmTokens;
   } catch (error) {
-    console.error('Error getting FCM tokens for user:', error);
-    throw error;
+    logger.error('Error getting FCM tokens for user:', error);
+    throw new Error(error.message);
   }
 };

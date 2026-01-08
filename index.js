@@ -17,6 +17,9 @@ import matchRouter from './api/match.js';
 import interviewRouter from './api/interview.js';
 import chatRouter from './api/chat.js';
 import { initializeFCM } from './utils/fcm.js';
+import { logger as loggerRoot } from './utils/logger.js';
+
+const loggerBase = loggerRoot.child({ fileContext: 'index.js' });
 
 const app = express();
 
@@ -58,5 +61,6 @@ const port = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 server.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+  const logger = loggerBase.child({ methodName: 'serverInit' });
+  logger.info(`Server listening on port ${port}`);
 });

@@ -2,9 +2,11 @@
 // This file contains all the configuration data that can be seeded into the database
 // Currently, the config is served statically, but this can be used for future database storage
 
+import { logger as loggerRoot } from '../utils/logger.js';
+
 export const configData = {
   privacyPolicy: `
-		<h1>Privacy Policy</h1>
+  <h1>Privacy Policy</h1>
 		<p>This is a placeholder privacy policy. Please replace with your actual privacy policy content.</p>
 		<p>Last updated: ${new Date().toISOString().split('T')[0]}</p>
 	`,
@@ -403,20 +405,32 @@ export const configData = {
   },
 };
 
+const loggerBase = loggerRoot.child('seeders/configSeeder.js');
+
 // Function to seed configuration data (for future database storage)
 export async function seedConfigData() {
+  const logger = loggerBase.child('seedConfigData');
   // This function can be used to populate database tables with configuration data
   // Currently returns the static data, but can be modified to store in database
-  console.log('Configuration data ready for seeding...');
+  logger.info('Configuration data ready for seeding...');
+  logger.debug('Configuration data', { configData });
   return configData;
 }
 
 // Function to get specific configuration section
 export function getConfigSection(section) {
+  const logger = loggerBase.child('getConfigSection');
+  logger.debug('Getting configuration section', {
+    section,
+    sectionData: configData[section],
+  });
   return configData[section] || null;
 }
 
 // Function to get all configuration keys
 export function getConfigKeys() {
+  const logger = loggerBase.child('getConfigKeys');
+  logger.debug('Getting configuration keys');
+  logger.debug('Configuration keys', { keys: Object.keys(configData) });
   return Object.keys(configData);
 }

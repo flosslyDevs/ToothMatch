@@ -10,6 +10,9 @@ import {
   Media,
 } from '../models/index.js';
 import { Op } from 'sequelize';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/jobs.js');
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -19,18 +22,20 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c; // Distance in miles
 }
 
 // Get all jobs (both locum shifts and permanent jobs) for a specific practitioner
 export async function getPractitionerJobs(req, res) {
+  const logger = loggerBase.child('getPractitionerJobs');
   const { practitionerId } = req.params;
 
   try {
+    logger.debug('Fetching practitioner jobs', { practitionerId });
     // Get locum shifts for the practitioner
     const locumShifts = await LocumShift.findAll({
       where: {
@@ -73,17 +78,17 @@ export async function getPractitionerJobs(req, res) {
       const shiftData = { ...shift.dataValues };
       const user = shift.User
         ? {
-          id: shift.User.id,
-          fullName: shift.User.fullName,
-          email: shift.User.email,
-        }
+            id: shift.User.id,
+            fullName: shift.User.fullName,
+            email: shift.User.email,
+          }
         : null;
       const practiceProfile = shift.PracticeProfile
         ? {
-          clinicType: shift.PracticeProfile.clinicType,
-          website: shift.PracticeProfile.website,
-          phoneNumber: shift.PracticeProfile.phoneNumber,
-        }
+            clinicType: shift.PracticeProfile.clinicType,
+            website: shift.PracticeProfile.website,
+            phoneNumber: shift.PracticeProfile.phoneNumber,
+          }
         : null;
       return {
         ...shiftData,
@@ -99,17 +104,17 @@ export async function getPractitionerJobs(req, res) {
       const jobData = { ...job.dataValues };
       const user = job.User
         ? {
-          id: job.User.id,
-          fullName: job.User.fullName,
-          email: job.User.email,
-        }
+            id: job.User.id,
+            fullName: job.User.fullName,
+            email: job.User.email,
+          }
         : null;
       const practiceProfile = job.PracticeProfile
         ? {
-          clinicType: job.PracticeProfile.clinicType,
-          website: job.PracticeProfile.website,
-          phoneNumber: job.PracticeProfile.phoneNumber,
-        }
+            clinicType: job.PracticeProfile.clinicType,
+            website: job.PracticeProfile.website,
+            phoneNumber: job.PracticeProfile.phoneNumber,
+          }
         : null;
       return {
         ...jobData,
@@ -126,6 +131,10 @@ export async function getPractitionerJobs(req, res) {
     // Sort by creation date (newest first)
     allJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+    logger.debug('Practitioner jobs fetched', {
+      practitionerId,
+      totalJobs: allJobs.length,
+    });
     return res.status(200).json({
       success: true,
       data: {
@@ -137,6 +146,11 @@ export async function getPractitionerJobs(req, res) {
       },
     });
   } catch (error) {
+    logger.error(
+      'Error fetching practitioner jobs',
+      { practitionerId, error: error.message },
+      error
+    );
     return res.status(500).json({
       success: false,
       message: 'Error fetching practitioner jobs',
@@ -147,7 +161,9 @@ export async function getPractitionerJobs(req, res) {
 
 // Get all jobs (both locum shifts and permanent jobs) - public endpoint
 export async function getAllJobs(req, res) {
+  const logger = loggerBase.child('getAllJobs');
   try {
+    logger.debug('Fetching all jobs');
     // Get all active locum shifts
     const locumShifts = await LocumShift.findAll({
       where: {},
@@ -239,11 +255,11 @@ export async function getAllJobs(req, res) {
       };
       const user = shift.User
         ? {
-          id: shift.User.id,
-          fullName: shift.User.fullName,
-          email: shift.User.email,
-          avatar,
-        }
+            id: shift.User.id,
+            fullName: shift.User.fullName,
+            email: shift.User.email,
+            avatar,
+          }
         : null;
       return {
         ...shiftData,
@@ -271,11 +287,11 @@ export async function getAllJobs(req, res) {
       };
       const user = job.User
         ? {
-          id: job.User.id,
-          fullName: job.User.fullName,
-          email: job.User.email,
-          avatar,
-        }
+            id: job.User.id,
+            fullName: job.User.fullName,
+            email: job.User.email,
+            avatar,
+          }
         : null;
       return {
         ...jobData,
@@ -292,6 +308,7 @@ export async function getAllJobs(req, res) {
     // Sort by creation date (newest first)
     allJobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+    logger.debug('All jobs fetched', { totalJobs: allJobs.length });
     return res.status(200).json({
       success: true,
       data: {
@@ -302,6 +319,7 @@ export async function getAllJobs(req, res) {
       },
     });
   } catch (error) {
+    logger.error('Error fetching all jobs', { error: error.message }, error);
     return res.status(500).json({
       success: false,
       message: 'Error fetching all jobs',
@@ -312,7 +330,9 @@ export async function getAllJobs(req, res) {
 
 // Filter jobs for candidates with multiple filter options
 export async function filterJobsForCandidates(req, res) {
+  const logger = loggerBase.child('filterJobsForCandidates');
   try {
+    logger.debug('Filtering jobs for candidates', { filters: req.query });
     const parseTimeToMinutes = (value) => {
       if (!value || typeof value !== 'string') return null;
       // Capture the first time token (e.g., "9 AM", "09:00", "09:00:00 PM") to support ranges like "9 AM - 5 PM"
@@ -637,11 +657,11 @@ export async function filterJobsForCandidates(req, res) {
 
       const user = shift.User
         ? {
-          id: shift.User.id,
-          fullName: shift.User.fullName,
-          email: shift.User.email,
-          avatar,
-        }
+            id: shift.User.id,
+            fullName: shift.User.fullName,
+            email: shift.User.email,
+            avatar,
+          }
         : null;
 
       return {
@@ -672,11 +692,11 @@ export async function filterJobsForCandidates(req, res) {
 
       const user = job.User
         ? {
-          id: job.User.id,
-          fullName: job.User.fullName,
-          email: job.User.email,
-          avatar,
-        }
+            id: job.User.id,
+            fullName: job.User.fullName,
+            email: job.User.email,
+            avatar,
+          }
         : null;
 
       return {
@@ -725,6 +745,11 @@ export async function filterJobsForCandidates(req, res) {
       },
     });
   } catch (error) {
+    logger.error(
+      'Error filtering jobs',
+      { filters: req.query, error: error.message },
+      error
+    );
     return res.status(500).json({
       success: false,
       message: 'Error filtering jobs',
@@ -735,7 +760,9 @@ export async function filterJobsForCandidates(req, res) {
 
 // Filter candidates for practices with multiple filter options
 export async function filterCandidatesForPractices(req, res) {
+  const logger = loggerBase.child('filterCandidatesForPractices');
   try {
+    logger.debug('Filtering candidates for practices', { filters: req.query });
     const {
       jobType, // 'part-time', 'full-time', etc.
       workingPattern, // 'day-shift', 'night-shift', etc.
@@ -942,6 +969,11 @@ export async function filterCandidatesForPractices(req, res) {
       },
     });
   } catch (error) {
+    logger.error(
+      'Error filtering candidates',
+      { filters: req.query, error: error.message },
+      error
+    );
     return res.status(500).json({
       success: false,
       message: 'Error filtering candidates',
@@ -952,9 +984,11 @@ export async function filterCandidatesForPractices(req, res) {
 
 // Activate a job
 export async function activateJob(req, res) {
+  const logger = loggerBase.child('activateJob');
   const { jobId } = req.params;
   const userId = req.user.sub;
   try {
+    logger.debug('Activating job', { userId, jobId });
     const job = await PermanentJob.findByPk(jobId);
     if (!job) {
       const locum = await LocumShift.findByPk(jobId);
@@ -970,32 +1004,43 @@ export async function activateJob(req, res) {
         return res.status(400).json({ message: 'Job is already active' });
       }
       await locum.update({ status: 'active' });
+      logger.info('Job activated', { userId, jobId, type: 'locum' });
       return res
         .status(200)
         .json({ message: 'Job activated successfully', type: 'locum' });
     }
     if (job.userId !== userId) {
+      logger.warn('Unauthorized job activation attempt', { userId, jobId });
       return res
         .status(403)
         .json({ message: 'You are not authorized to activate this job' });
     }
     if (job.status === 'active') {
+      logger.warn('Job already active', { userId, jobId });
       return res.status(400).json({ message: 'Job is already active' });
     }
     await job.update({ status: 'active' });
+    logger.info('Job activated', { userId, jobId, type: 'permanent' });
     return res
       .status(200)
       .json({ message: 'Job activated successfully', type: 'permanent' });
   } catch (error) {
+    logger.error(
+      'Error activating job',
+      { userId, jobId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Pause a job
 export async function pauseJob(req, res) {
+  const logger = loggerBase.child('pauseJob');
   const { jobId } = req.params;
   const userId = req.user.sub;
   try {
+    logger.debug('Pausing job', { userId, jobId });
     const job = await PermanentJob.findByPk(jobId);
     if (!job) {
       const locum = await LocumShift.findByPk(jobId);
@@ -1011,23 +1056,32 @@ export async function pauseJob(req, res) {
         return res.status(400).json({ message: 'Job is already paused' });
       }
       await locum.update({ status: 'paused' });
+      logger.info('Job paused', { userId, jobId, type: 'locum' });
       return res
         .status(200)
         .json({ message: 'Job paused successfully', type: 'locum' });
     }
     if (job.userId !== userId) {
+      logger.warn('Unauthorized job pause attempt', { userId, jobId });
       return res
         .status(403)
         .json({ message: 'You are not authorized to pause this job' });
     }
     if (job.status === 'paused') {
+      logger.warn('Job already paused', { userId, jobId });
       return res.status(400).json({ message: 'Job is already paused' });
     }
     await job.update({ status: 'paused' });
+    logger.info('Job paused', { userId, jobId, type: 'permanent' });
     return res
       .status(200)
       .json({ message: 'Job paused successfully', type: 'permanent' });
   } catch (error) {
+    logger.error(
+      'Error pausing job',
+      { userId, jobId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }

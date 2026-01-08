@@ -5,9 +5,13 @@ import {
   CandidateProfile,
   Media,
 } from '../models/index.js';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/interview.js');
 
 // Schedule an interview (Practice side)
 export async function scheduleInterview(req, res) {
+  const logger = loggerBase.child('scheduleInterview');
   const practiceUserId = req.user.sub;
   const {
     candidateUserId,
@@ -19,8 +23,12 @@ export async function scheduleInterview(req, res) {
   } = req.body;
 
   try {
+    logger.debug('Scheduling interview', { practiceUserId, candidateUserId });
     // Validate required fields
     if (!candidateUserId || !meetingType || !location || !date || !time) {
+      logger.warn('Missing required fields for interview scheduling', {
+        practiceUserId,
+      });
       return res.status(400).json({
         message:
           'Missing required fields: candidateUserId, meetingType, location, date, and time are required',
@@ -53,12 +61,19 @@ export async function scheduleInterview(req, res) {
     // Verify candidate exists
     const candidate = await User.findByPk(candidateUserId);
     if (!candidate || candidate.role !== 'candidate') {
+      logger.warn('Candidate not found or invalid role', {
+        candidateUserId,
+        practiceUserId,
+      });
       return res.status(404).json({ message: 'Candidate not found' });
     }
 
     // Verify practice user exists and is a practice
     const practice = await User.findByPk(practiceUserId);
     if (!practice || practice.role !== 'practice') {
+      logger.warn('Practice user not found or invalid role', {
+        practiceUserId,
+      });
       return res
         .status(403)
         .json({ message: 'Only practices can schedule interviews' });
@@ -104,11 +119,21 @@ export async function scheduleInterview(req, res) {
       ],
     });
 
+    logger.info('Interview scheduled successfully', {
+      interviewId: interview.id,
+      practiceUserId,
+      candidateUserId,
+    });
     return res.status(201).json({
       message: 'Interview scheduled successfully',
       interview: interviewWithDetails,
     });
   } catch (error) {
+    logger.error(
+      'Error scheduling interview',
+      { practiceUserId, candidateUserId, error: error.message },
+      error
+    );
     return res.status(500).json({
       message: 'Error scheduling interview',
       error: error.message,
@@ -118,12 +143,17 @@ export async function scheduleInterview(req, res) {
 
 // Get interviews for a candidate (Candidate side)
 export async function getCandidateInterviews(req, res) {
+  const logger = loggerBase.child('getCandidateInterviews');
   const candidateUserId = req.user.sub;
 
   try {
+    logger.debug('Fetching candidate interviews', { candidateUserId });
     // Verify user is a candidate
     const candidate = await User.findByPk(candidateUserId);
     if (!candidate || candidate.role !== 'candidate') {
+      logger.warn('Invalid role for getting candidate interviews', {
+        candidateUserId,
+      });
       return res
         .status(403)
         .json({ message: 'Only candidates can view their interviews' });
@@ -175,12 +205,17 @@ export async function getCandidateInterviews(req, res) {
 
 // Get interviews scheduled by a practice (Practice side - optional but useful)
 export async function getPracticeInterviews(req, res) {
+  const logger = loggerBase.child('getPracticeInterviews');
   const practiceUserId = req.user.sub;
 
   try {
+    logger.debug('Fetching practice interviews', { practiceUserId });
     // Verify user is a practice
     const practice = await User.findByPk(practiceUserId);
     if (!practice || practice.role !== 'practice') {
+      logger.warn('Invalid role for getting practice interviews', {
+        practiceUserId,
+      });
       return res.status(403).json({
         message: 'Only practices can view their scheduled interviews',
       });
@@ -230,15 +265,19 @@ export async function getPracticeInterviews(req, res) {
 
 // Unified endpoint: Get interviews based on user role (auto-detects candidate or practice)
 export async function getMyInterviews(req, res) {
+  const logger = loggerBase.child('getMyInterviews');
   const userId = req.user?.sub;
 
   if (!userId) {
+    logger.warn('Unauthenticated request for interviews');
     return res.status(401).json({ message: 'User not authenticated' });
   }
 
   try {
+    logger.debug('Fetching user interviews', { userId });
     const user = await User.findByPk(userId);
     if (!user) {
+      logger.warn('User not found', { userId });
       return res.status(404).json({ message: 'User not found' });
     }
 
@@ -283,7 +322,8 @@ export async function getMyInterviews(req, res) {
 
         // Remove Media from Practice object
         if (interviewData.Practice?.Media) {
-          const { Media: _ignoredMedia, ...practiceWithoutMedia } = interviewData.Practice;
+          const { Media: _ignoredMedia, ...practiceWithoutMedia } =
+            interviewData.Practice;
           interviewData.Practice = {
             ...practiceWithoutMedia,
             avatar,
@@ -333,7 +373,8 @@ export async function getMyInterviews(req, res) {
 
         // Remove Media from Candidate object
         if (interviewData.Candidate?.Media) {
-          const { Media: _ignoredMedia, ...candidateWithoutMedia } = interviewData.Candidate;
+          const { Media: _ignoredMedia, ...candidateWithoutMedia } =
+            interviewData.Candidate;
           interviewData.Candidate = {
             ...candidateWithoutMedia,
             avatar,
@@ -348,13 +389,22 @@ export async function getMyInterviews(req, res) {
       return res.status(403).json({ message: 'Invalid user role' });
     }
 
+    logger.debug('User interviews fetched', {
+      userId,
+      role: user.role,
+      count: interviews.length,
+    });
     return res.status(200).json({
       interviews,
       count: interviews.length,
       role: user.role,
     });
   } catch (error) {
-    console.error('Error fetching interviews:', error);
+    logger.error(
+      'Error fetching interviews',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({
       message: 'Error fetching interviews',
       error: error.message,
@@ -364,12 +414,15 @@ export async function getMyInterviews(req, res) {
 
 // Candidate: Request reschedule for an interview
 export async function requestReschedule(req, res) {
+  const logger = loggerBase.child('requestReschedule');
   const candidateUserId = req.user?.sub;
   const { id } = req.params;
   const { requestedDate, requestedTime, reason } = req.body;
 
   try {
+    logger.debug('Requesting reschedule', { candidateUserId, interviewId: id });
     if (!candidateUserId) {
+      logger.warn('Unauthenticated reschedule request');
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -455,12 +508,20 @@ export async function requestReschedule(req, res) {
       ],
     });
 
+    logger.info('Reschedule request submitted', {
+      candidateUserId,
+      interviewId: id,
+    });
     return res.status(200).json({
       message: 'Reschedule request submitted successfully',
       interview: updatedInterview,
     });
   } catch (error) {
-    console.error('Error requesting reschedule:', error);
+    logger.error(
+      'Error requesting reschedule',
+      { candidateUserId, interviewId: id, error: error.message },
+      error
+    );
     return res.status(500).json({
       message: 'Error requesting reschedule',
       error: error.message,
@@ -470,12 +531,15 @@ export async function requestReschedule(req, res) {
 
 // Practice: Approve reschedule and update interview date/time
 export async function approveReschedule(req, res) {
+  const logger = loggerBase.child('approveReschedule');
   const practiceUserId = req.user?.sub;
   const { id } = req.params;
   const { date, time } = req.body;
 
   try {
+    logger.debug('Approving reschedule', { practiceUserId, interviewId: id });
     if (!practiceUserId) {
+      logger.warn('Unauthenticated reschedule approval request');
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -566,12 +630,17 @@ export async function approveReschedule(req, res) {
       ],
     });
 
+    logger.info('Reschedule approved', { practiceUserId, interviewId: id });
     return res.status(200).json({
       message: 'Interview rescheduled successfully',
       interview: updatedInterview,
     });
   } catch (error) {
-    console.error('Error approving reschedule:', error);
+    logger.error(
+      'Error approving reschedule',
+      { practiceUserId, interviewId: id, error: error.message },
+      error
+    );
     return res.status(500).json({
       message: 'Error approving reschedule',
       error: error.message,
@@ -581,12 +650,15 @@ export async function approveReschedule(req, res) {
 
 // Candidate: Decline an interview
 export async function declineInterview(req, res) {
+  const logger = loggerBase.child('declineInterview');
   const candidateUserId = req.user?.sub;
   const { id } = req.params;
   const { reason } = req.body;
 
   try {
+    logger.debug('Declining interview', { candidateUserId, interviewId: id });
     if (!candidateUserId) {
+      logger.warn('Unauthenticated interview decline request');
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -652,12 +724,17 @@ export async function declineInterview(req, res) {
       ],
     });
 
+    logger.info('Interview declined', { candidateUserId, interviewId: id });
     return res.status(200).json({
       message: 'Interview declined successfully',
       interview: updatedInterview,
     });
   } catch (error) {
-    console.error('Error declining interview:', error);
+    logger.error(
+      'Error declining interview',
+      { candidateUserId, interviewId: id, error: error.message },
+      error
+    );
     return res.status(500).json({
       message: 'Error declining interview',
       error: error.message,
@@ -667,11 +744,14 @@ export async function declineInterview(req, res) {
 
 // Candidate: Accept (confirm) an interview
 export async function acceptInterview(req, res) {
+  const logger = loggerBase.child('acceptInterview');
   const candidateUserId = req.user?.sub;
   const { id } = req.params;
 
   try {
+    logger.debug('Accepting interview', { candidateUserId, interviewId: id });
     if (!candidateUserId) {
+      logger.warn('Unauthenticated interview accept request');
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
@@ -780,12 +860,17 @@ export async function acceptInterview(req, res) {
       ],
     });
 
+    logger.info('Interview accepted', { candidateUserId, interviewId: id });
     return res.status(200).json({
       message: 'Interview accepted successfully',
       interview: updatedInterview,
     });
   } catch (error) {
-    console.error('Error accepting interview:', error);
+    logger.error(
+      'Error accepting interview',
+      { candidateUserId, interviewId: id, error: error.message },
+      error
+    );
     return res.status(500).json({
       message: 'Error accepting interview',
       error: error.message,

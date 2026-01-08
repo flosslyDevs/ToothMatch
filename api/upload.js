@@ -16,14 +16,12 @@ router.post('/single', upload.single('file'), async (req, res) => {
   const file = req.file;
   if (!file) return res.status(400).json({ message: 'No file uploaded' });
   const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${path.basename(file.path)}`;
-  return res
-    .status(201)
-    .json({
-      url: fileUrl,
-      filename: path.basename(file.path),
-      size: file.size,
-      mimetype: file.mimetype,
-    });
+  return res.status(201).json({
+    url: fileUrl,
+    filename: path.basename(file.path),
+    size: file.size,
+    mimetype: file.mimetype,
+  });
 });
 
 // Multiple files upload: field name 'files'
@@ -65,11 +63,9 @@ const handleMulterError = (err, req, res, next) => {
           hint: 'Example: formData.append("file", file1); formData.append("file", file2);',
         });
       }
-      return res
-        .status(400)
-        .json({
-          message: `Unexpected field: ${err.field}. Please use 'file' as the field name for file uploads.`,
-        });
+      return res.status(400).json({
+        message: `Unexpected field: ${err.field}. Please use 'file' as the field name for file uploads.`,
+      });
     }
     return res
       .status(400)

@@ -31,14 +31,19 @@ import {
 } from '../models/index.js';
 import { Op } from 'sequelize';
 import { sequelize } from '../services/db.js';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/profile.js');
 
 // Step 1-2: Basic Profile
 export async function createProfile(req, res) {
+  const logger = loggerBase.child('createProfile');
   const { fullName, gender, jobTitle, currentStatus, linkedinUrl, aboutMe } =
     req.body;
   const userId = req.user.sub;
 
   try {
+    logger.debug('Creating profile', { userId });
     const [profile, created] = await CandidateProfile.findOrCreate({
       where: { userId },
       defaults: {
@@ -63,29 +68,42 @@ export async function createProfile(req, res) {
       });
     }
 
+    logger.info('Profile created/updated', { userId, profileId: profile.id });
     return res.status(200).json({ profile });
   } catch (error) {
+    logger.error(
+      'Error creating profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function getProfile(req, res) {
   const userId = req.user.sub;
+  const logger = loggerBase.child('getProfile');
 
   try {
     const profile = await CandidateProfile.findOne({ where: { userId } });
+    logger.info('Profile created/updated', { userId, profileId: profile.id });
     return res.status(200).json({ profile });
   } catch (error) {
+    logger.error(
+      'Error creating profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Step 3: Education
 export async function addEducation(req, res) {
+  const logger = loggerBase.child('addEducation');
   const { highestLevel, institution, fieldOfStudy, startDate, endDate } =
     req.body;
   const userId = req.user.sub;
-
   try {
     const education = await Education.create({
       userId,
@@ -95,19 +113,32 @@ export async function addEducation(req, res) {
       startDate,
       endDate,
     });
+    logger.info('Education added', { userId, educationId: education.id });
     return res.status(201).json({ education });
   } catch (error) {
+    logger.error(
+      'Error adding education',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function getEducations(req, res) {
   const userId = req.user.sub;
+  const logger = loggerBase.child('getEducations');
 
   try {
     const educations = await Education.findAll({ where: { userId } });
+    logger.info('Educations fetched', { userId, count: educations.length });
     return res.status(200).json({ educations });
   } catch (error) {
+    logger.error(
+      'Error fetching educations',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
@@ -124,11 +155,12 @@ export async function addWorkExperience(req, res) {
     professionalRegNumber,
   } = req.body;
   const userId = req.user.sub;
-
+  const logger = loggerBase.child('addWorkExperience');
   try {
     if (!company) {
       return res.status(400).json({ message: 'company is required' });
     }
+    logger.debug('Adding work experience', { userId });
     const experience = await WorkExperience.create({
       userId,
       company,
@@ -139,30 +171,50 @@ export async function addWorkExperience(req, res) {
       yearsExperience,
       professionalRegNumber,
     });
+    logger.info('Work experience added', {
+      userId,
+      experienceId: experience.id,
+    });
     return res.status(201).json({ experience });
   } catch (error) {
+    logger.error(
+      'Error adding work experience',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function getWorkExperiences(req, res) {
   const userId = req.user.sub;
-
+  const logger = loggerBase.child('getWorkExperiences');
   try {
     const experiences = await WorkExperience.findAll({ where: { userId } });
+    logger.info('Work experiences fetched', {
+      userId,
+      count: experiences.length,
+    });
     return res.status(200).json({ experiences });
   } catch (error) {
+    logger.error(
+      'Error fetching work experiences',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Step 4: Work Personality
 export async function updateWorkPersonality(req, res) {
+  const logger = loggerBase.child('updateWorkPersonality');
   const { workingSuperpower, favoriteWorkVibe, tacklingDifficultSituations } =
     req.body;
   const userId = req.user.sub;
 
   try {
+    logger.debug('Updating work personality', { userId });
     const [personality, created] = await WorkPersonality.findOrCreate({
       where: { userId },
       defaults: {
@@ -174,6 +226,7 @@ export async function updateWorkPersonality(req, res) {
     });
 
     if (!created) {
+      logger.debug('Work personality not created, updating existing');
       await personality.update({
         workingSuperpower,
         favoriteWorkVibe,
@@ -181,6 +234,10 @@ export async function updateWorkPersonality(req, res) {
       });
     }
 
+    logger.info('Work personality updated', {
+      userId,
+      personalityId: personality.id,
+    });
     return res.status(200).json({ personality });
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -189,10 +246,12 @@ export async function updateWorkPersonality(req, res) {
 
 // Step 5: Skills and Specializations
 export async function addSkills(req, res) {
+  const logger = loggerBase.child('addSkills');
   const { skillIds } = req.body;
   const userId = req.user.sub;
 
   try {
+    logger.debug('Adding skills', { userId, skillCount: skillIds?.length });
     // Remove existing skills
     await UserSkill.destroy({ where: { userId } });
 
@@ -201,17 +260,28 @@ export async function addSkills(req, res) {
       skillIds.map((skillId) => UserSkill.create({ userId, skillId }))
     );
 
+    logger.info('Skills added', { userId, count: userSkills.length });
     return res.status(200).json({ userSkills });
   } catch (error) {
+    logger.error(
+      'Error adding skills',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function addSpecializations(req, res) {
+  const logger = loggerBase.child('addSpecializations');
   const { specializationIds } = req.body;
   const userId = req.user.sub;
 
   try {
+    logger.debug('Adding specializations', {
+      userId,
+      specializationCount: specializationIds?.length,
+    });
     // Remove existing specializations
     await UserSpecialization.destroy({ where: { userId } });
 
@@ -222,18 +292,29 @@ export async function addSpecializations(req, res) {
       )
     );
 
+    logger.info('Specializations added', {
+      userId,
+      count: userSpecializations.length,
+    });
     return res.status(200).json({ userSpecializations });
   } catch (error) {
+    logger.error(
+      'Error adding specializations',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Step 6: Media
 export async function uploadMedia(req, res) {
+  const logger = loggerBase.child('uploadMedia');
   const { kind, url } = req.body;
   const userId = req.user.sub;
 
   try {
+    logger.debug('Uploading media', { userId, kind });
     let media = null;
     // Replace media if its cover or profile picture
     if (kind === 'cover' || kind === 'profile_photo') {
@@ -241,49 +322,87 @@ export async function uploadMedia(req, res) {
     } else {
       media = await Media.create({ userId, kind, url });
     }
+    logger.info('Media uploaded', { userId, kind });
     return res.status(201).json({ media });
   } catch (error) {
+    logger.error(
+      'Error uploading media',
+      { userId, kind, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function getMedia(req, res) {
+  const logger = loggerBase.child('getMedia');
   const userId = req.user.sub;
 
   try {
+    logger.debug('Fetching media', { userId });
     const media = await Media.findAll({ where: { userId } });
+    logger.debug('Media fetched', { userId, count: media.length });
     return res.status(200).json({ media });
   } catch (error) {
+    logger.error(
+      'Error fetching media',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Step 7: Identity Documents
 export async function uploadIdentityDocument(req, res) {
+  const logger = loggerBase.child('uploadIdentityDocument');
   const { type, url } = req.body;
   const userId = req.user.sub;
 
   try {
+    logger.debug('Uploading identity document', { userId, type });
     const document = await IdentityDocument.create({ userId, type, url });
+    logger.info('Identity document uploaded', {
+      userId,
+      type,
+      documentId: document.id,
+    });
     return res.status(201).json({ document });
   } catch (error) {
+    logger.error(
+      'Error uploading identity document',
+      { userId, type, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function getIdentityDocuments(req, res) {
+  const logger = loggerBase.child('getIdentityDocuments');
   const userId = req.user.sub;
 
   try {
+    logger.debug('Fetching identity documents', { userId });
     const documents = await IdentityDocument.findAll({ where: { userId } });
+    logger.debug('Identity documents fetched', {
+      userId,
+      count: documents.length,
+    });
     return res.status(200).json({ documents });
   } catch (error) {
+    logger.error(
+      'Error fetching identity documents',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Step 8: Job Preferences
 export async function updateJobPreferences(req, res) {
+  const logger = loggerBase.child('updateJobPreferences');
   const {
     idealJobTitle,
     lookingFor,
@@ -299,6 +418,7 @@ export async function updateJobPreferences(req, res) {
   const userId = req.user.sub;
 
   try {
+    logger.debug('Updating job preferences', { userId });
     const [preferences, created] = await JobPreference.findOrCreate({
       where: { userId },
       defaults: {
@@ -331,63 +451,103 @@ export async function updateJobPreferences(req, res) {
       });
     }
 
+    logger.info('Job preferences updated', {
+      userId,
+      preferenceId: preferences.id,
+    });
     return res.status(200).json({ preferences });
   } catch (error) {
+    logger.error(
+      'Error updating job preferences',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Step 8: Availability
 export async function addAvailabilitySlot(req, res) {
+  const logger = loggerBase.child('addAvailabilitySlot');
   const { start, end } = req.body;
   const userId = req.user.sub;
 
   try {
+    logger.debug('Adding availability slot', { userId, start, end });
     const slot = await AvailabilitySlot.create({ userId, start, end });
+    logger.info('Availability slot added', { userId, slotId: slot.id });
     return res.status(201).json({ slot });
   } catch (error) {
+    logger.error(
+      'Error adding availability slot',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function getAvailabilitySlots(req, res) {
+  const logger = loggerBase.child('getAvailabilitySlots');
   const userId = req.user.sub;
 
   try {
+    logger.debug('Fetching availability slots', { userId });
     const slots = await AvailabilitySlot.findAll({ where: { userId } });
+    logger.debug('Availability slots fetched', { userId, count: slots.length });
     return res.status(200).json({ slots });
   } catch (error) {
+    logger.error(
+      'Error fetching availability slots',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Get all skills and specializations for dropdowns
 export async function getAllSkills(req, res) {
+  const logger = loggerBase.child('getAllSkills');
   try {
+    logger.debug('Fetching all skills');
     const skills = await Skill.findAll();
+    logger.debug('All skills fetched', { count: skills.length });
     return res.status(200).json({ skills });
   } catch (error) {
+    logger.error('Error fetching all skills', { error: error.message }, error);
     return res.status(500).json({ message: error.message });
   }
 }
 
 export async function getAllSpecializations(req, res) {
+  const logger = loggerBase.child('getAllSpecializations');
   try {
+    logger.debug('Fetching all specializations');
     const specializations = await Specialization.findAll();
+    logger.debug('All specializations fetched', {
+      count: specializations.length,
+    });
     return res.status(200).json({ specializations });
   } catch (error) {
+    logger.error(
+      'Error fetching all specializations',
+      { error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Unified profile fetch for either candidate or practice based on kind or auto-detect
 export async function getUnifiedProfile(req, res) {
+  const logger = loggerBase.child('getUnifiedProfile');
   const userId = req.user.sub;
   const { kind } = req.query; // optional: 'candidate' | 'practice'
 
+  logger.debug('Getting unified profile', { userId, kind });
   try {
     let resolvedKind = (kind || '').toLowerCase();
-
     if (resolvedKind !== 'candidate' && resolvedKind !== 'practice') {
       // auto-detect: prefer practice if exists, else candidate
       const practice = await PracticeProfile.findOne({ where: { userId } });
@@ -398,28 +558,64 @@ export async function getUnifiedProfile(req, res) {
       }
     }
 
+    logger.debug('Resolved kind', { resolvedKind });
+
     if (resolvedKind === 'candidate') {
+      logger.debug('Fetching candidate profile data', { userId });
       // Reuse logic from getCompleteProfile
       const profile = await CandidateProfile.findOne({ where: { userId } });
+      logger.debug('Candidate profile fetched', {
+        userId,
+        profileExists: !!profile,
+      });
+
       const educations = await Education.findAll({ where: { userId } });
+      logger.debug('Educations fetched', { userId, count: educations.length });
+
       const workExperiences = await WorkExperience.findAll({
         where: { userId },
       });
+      logger.debug('Work experiences fetched', {
+        userId,
+        count: workExperiences.length,
+      });
+
       const personality = await WorkPersonality.findOne({ where: { userId } });
+      logger.debug('Personality fetched', { userId, exists: !!personality });
+
       const media = await Media.findAll({ where: { userId } });
+      logger.debug('Media fetched', { userId, count: media.length });
+
       const documents = await IdentityDocument.findAll({ where: { userId } });
+      logger.debug('Documents fetched', { userId, count: documents.length });
+
       const jobPreferences = await JobPreference.findOne({ where: { userId } });
+      logger.debug('Job preferences fetched', {
+        userId,
+        exists: !!jobPreferences,
+      });
+
       const availabilitySlots = await AvailabilitySlot.findAll({
         where: { userId },
+      });
+      logger.debug('Availability slots fetched', {
+        userId,
+        count: availabilitySlots.length,
       });
 
       const userSkills = await UserSkill.findAll({
         where: { userId },
         include: [{ model: Skill }],
       });
+      logger.debug('User skills fetched', { userId, count: userSkills.length });
+
       const userSpecializations = await UserSpecialization.findAll({
         where: { userId },
         include: [{ model: Specialization }],
+      });
+      logger.debug('User specializations fetched', {
+        userId,
+        count: userSpecializations.length,
       });
 
       // Extract logo from media (prefer kind='logo', else first item)
@@ -429,16 +625,18 @@ export async function getUnifiedProfile(req, res) {
           (m) => (m.kind || '').toLowerCase() === 'logo'
         );
         logo = logoMedia ? logoMedia.url : media[0] ? media[0].url : null;
+        logger.debug('Logo extracted', { userId });
       }
 
       // Add logo to profile object
       const profileWithLogo = profile
         ? {
-          ...profile.toJSON(),
-          logo,
-        }
+            ...profile.toJSON(),
+            logo,
+          }
         : null;
 
+      logger.debug('Candidate profile response prepared', { userId });
       return res.status(200).json({
         kind: 'candidate',
         profile: profileWithLogo,
@@ -455,20 +653,44 @@ export async function getUnifiedProfile(req, res) {
     }
 
     // practice
+    logger.debug('Fetching practice profile data', { userId });
     const practiceProfile = await PracticeProfile.findOne({
       where: { userId },
     });
+    logger.debug('Practice profile fetched', {
+      userId,
+      profileExists: !!practiceProfile,
+    });
+
     const practiceMedia = await PracticeMedia.findAll({ where: { userId } });
+    logger.debug('Practice media fetched', {
+      userId,
+      count: practiceMedia.length,
+    });
+
     const practiceLocations = await PracticeLocation.findAll({
       where: { userId },
     });
+    logger.debug('Practice locations fetched', {
+      userId,
+      count: practiceLocations.length,
+    });
+
     const practiceCompliance = await PracticeCompliance.findOne({
       where: { userId },
+    });
+    logger.debug('Practice compliance fetched', {
+      userId,
+      exists: !!practiceCompliance,
     });
 
     // Also check IdentityDocument table (in case documents were uploaded via /api/upload/user/document)
     const identityDocuments = await IdentityDocument.findAll({
       where: { userId },
+    });
+    logger.debug('Identity documents fetched', {
+      userId,
+      count: identityDocuments.length,
     });
 
     // Extract logo from media (prefer kind='logo', else first item)
@@ -482,14 +704,15 @@ export async function getUnifiedProfile(req, res) {
         : practiceMedia[0]
           ? practiceMedia[0].url
           : null;
+      logger.debug('Logo extracted', { userId });
     }
 
     // Add logo to profile object
     const profileWithLogo = practiceProfile
       ? {
-        ...practiceProfile.toJSON(),
-        logo,
-      }
+          ...practiceProfile.toJSON(),
+          logo,
+        }
       : null;
 
     // Combine compliance documents and identity documents
@@ -498,22 +721,38 @@ export async function getUnifiedProfile(req, res) {
       ...complianceDocuments,
       ...identityDocuments.map((doc) => doc.toJSON()),
     ];
+    logger.debug('Documents combined', {
+      userId,
+      totalCount: allDocuments.length,
+    });
 
-    return res.status(200).json({
+    const response = {
       kind: 'practice',
       profile: profileWithLogo,
       media: practiceMedia,
       locations: practiceLocations,
       documents: allDocuments,
+    };
+
+    logger.debug('Practice profile response prepared', {
+      userId: req.user?.sub,
     });
+    return res.status(200).json(response);
   } catch (error) {
+    logger.error(
+      'Error fetching unified profile',
+      { userId: req.user?.sub, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Profile deletion handler
 export async function deleteProfile(req, res) {
+  const logger = loggerBase.child('deleteProfile');
   const userId = req.user.sub;
+  logger.debug('Deleting profile', { userId });
   const transaction = await sequelize.transaction();
   try {
     const user = await User.findByPk(userId, { transaction });
@@ -666,68 +905,134 @@ export async function deleteProfile(req, res) {
     await User.destroy({ where: { id: userId }, transaction });
     await transaction.commit();
 
+    logger.info('Profile deleted successfully', { userId });
     return res.status(200).json({ message: 'Profile deleted successfully' });
   } catch (error) {
     await transaction.rollback();
+    logger.error(
+      'Error deleting profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Report candidate profile
 export async function reportCandidateProfile(req, res) {
+  const logger = loggerBase.child('reportCandidateProfile');
   const { reportedUserId } = req.params;
   const { reason } = req.body;
   const reportedByUserId = req.user.sub;
   try {
+    logger.debug('Reporting candidate profile', {
+      reportedByUserId,
+      reportedUserId,
+    });
     const result = await Report.create({
       reportedUserId,
       reportedByUserId,
       reason,
     });
+    logger.info('Candidate profile reported', {
+      reportedByUserId,
+      reportedUserId,
+      reportId: result.id,
+    });
     return res
       .status(200)
       .json({ message: 'Profile reported successfully', reportId: result.id });
   } catch (error) {
+    logger.error(
+      'Error reporting candidate profile',
+      { reportedByUserId, reportedUserId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Block candidate profile
 export async function blockCandidateProfile(req, res) {
+  const logger = loggerBase.child('blockCandidateProfile');
   const { blockedUserId } = req.params;
   const blockedByUserId = req.user.sub;
   try {
+    logger.debug('Blocking candidate profile', {
+      blockedByUserId,
+      blockedUserId,
+    });
     await Blocklist.create({ blockedUserId, blockedByUserId });
+    logger.info('Candidate profile blocked', {
+      blockedByUserId,
+      blockedUserId,
+    });
     return res
       .status(200)
       .json({ message: 'Candidate profile blocked successfully' });
   } catch (error) {
+    logger.warn('Error blocking candidate profile - may already be blocked', {
+      blockedByUserId,
+      blockedUserId,
+      error: error.message,
+    });
     return res.status(500).json({ message: 'Already blocked' });
   }
 }
 
 // Unblock candidate profile
 export async function unblockCandidateProfile(req, res) {
+  const logger = loggerBase.child('unblockCandidateProfile');
   const { blockedUserId } = req.params;
   const blockedByUserId = req.user.sub;
   try {
+    logger.debug('Unblocking candidate profile', {
+      blockedByUserId,
+      blockedUserId,
+    });
     await Blocklist.destroy({ where: { blockedUserId, blockedByUserId } });
+    logger.info('Candidate profile unblocked', {
+      blockedByUserId,
+      blockedUserId,
+    });
     return res
       .status(200)
       .json({ message: 'Candidate profile unblocked successfully' });
   } catch (error) {
+    logger.warn('Error unblocking candidate profile - may not be blocked', {
+      blockedByUserId,
+      blockedUserId,
+      error: error.message,
+    });
     return res.status(500).json({ message: 'Not blocked' });
   }
 }
 
 // Rate candidate profile (by practice)
 export async function rateCandidateProfile(req, res) {
+  const logger = loggerBase.child('rateCandidateProfile');
   const { candidateId } = req.params;
   const { rating, comment } = req.body;
+  const practiceUserId = req.user.sub;
+  logger.debug('Rating candidate profile', {
+    practiceUserId,
+    candidateId,
+    rating,
+  });
   if (rating < 1 || rating > 5) {
+    logger.warn('Invalid rating value', {
+      practiceUserId,
+      candidateId,
+      rating,
+    });
     return res.status(400).json({ message: 'Rating must be between 1 and 5' });
   }
   if (comment && comment.length > 500) {
+    logger.warn('Comment too long', {
+      practiceUserId,
+      candidateId,
+      commentLength: comment.length,
+    });
     return res
       .status(400)
       .json({ message: 'Comment must be less than 500 characters' });
@@ -743,6 +1048,10 @@ export async function rateCandidateProfile(req, res) {
       });
     }
     if (!profile) {
+      logger.warn('Candidate profile not found for rating', {
+        practiceUserId,
+        candidateId,
+      });
       return res.status(404).json({ message: 'Candidate profile not found' });
     }
     const candidateRating = await Rating.create({
@@ -752,20 +1061,31 @@ export async function rateCandidateProfile(req, res) {
       rating,
       comment,
     });
-    return res
-      .status(200)
-      .json({
-        message: 'Candidate profile rated successfully',
-        candidateRating,
-      });
+    logger.info('Candidate profile rated', {
+      practiceUserId,
+      candidateId,
+      rating,
+      ratingId: candidateRating.id,
+    });
+    return res.status(200).json({
+      message: 'Candidate profile rated successfully',
+      candidateRating,
+    });
   } catch (error) {
+    logger.error(
+      'Error rating candidate profile',
+      { practiceUserId, candidateId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Complete Profile Create (All Steps in One)
 export async function createCompleteProfile(req, res) {
+  const logger = loggerBase.child('createCompleteProfile');
   const userId = req.user.sub;
+  logger.debug('Creating complete profile', { userId });
   const {
     // Step 1-2: Basic Profile
     fullName,
@@ -797,12 +1117,10 @@ export async function createCompleteProfile(req, res) {
     // Do not allow duplicate profile creation
     const existing = await CandidateProfile.findOne({ where: { userId } });
     if (existing) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Candidate profile already exists. Use PUT /api/profile/complete to update.',
-        });
+      return res.status(400).json({
+        message:
+          'Candidate profile already exists. Use PUT /api/profile/complete to update.',
+      });
     }
 
     // Step 1-2: Create Profile
@@ -906,21 +1224,27 @@ export async function createCompleteProfile(req, res) {
       );
     }
 
-    return res
-      .status(201)
-      .json({
-        message: 'Candidate profile created successfully',
-        profileId: profile.id,
-        profileCompletion: true,
-      });
+    logger.info('Complete profile created', { userId, profileId: profile.id });
+    return res.status(201).json({
+      message: 'Candidate profile created successfully',
+      profileId: profile.id,
+      profileCompletion: true,
+    });
   } catch (error) {
+    logger.error(
+      'Error creating complete profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Complete Profile Update (All Steps in One)
 export async function updateCompleteProfile(req, res) {
+  const logger = loggerBase.child('updateCompleteProfile');
   const userId = req.user.sub;
+  logger.debug('Updating complete profile', { userId });
   const {
     // Step 1-2: Basic Profile
     fullName,
@@ -1095,22 +1419,28 @@ export async function updateCompleteProfile(req, res) {
     // Update profileCompletion to true after successful profile update
     await profile.update({ profileCompletion: true });
 
-    return res
-      .status(200)
-      .json({
-        message: 'Profile updated successfully',
-        profileCompletion: true,
-      });
+    logger.info('Complete profile updated', { userId });
+    return res.status(200).json({
+      message: 'Profile updated successfully',
+      profileCompletion: true,
+    });
   } catch (error) {
+    logger.error(
+      'Error updating complete profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Get Complete Profile (All Data)
 export async function getCompleteProfile(req, res) {
+  const logger = loggerBase.child('getCompleteProfile');
   const userId = req.user.sub;
 
   try {
+    logger.debug('Fetching complete profile', { userId });
     const profile = await CandidateProfile.findOne({ where: { userId } });
     const educations = await Education.findAll({ where: { userId } });
     const workExperiences = await WorkExperience.findAll({ where: { userId } });
@@ -1144,9 +1474,9 @@ export async function getCompleteProfile(req, res) {
     // Add logo to profile object
     const profileWithLogo = profile
       ? {
-        ...profile.toJSON(),
-        logo,
-      }
+          ...profile.toJSON(),
+          logo,
+        }
       : null;
 
     return res.status(200).json({
@@ -1162,15 +1492,22 @@ export async function getCompleteProfile(req, res) {
       availabilitySlots,
     });
   } catch (error) {
+    logger.error(
+      'Error fetching complete profile',
+      { userId, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
 
 // Get Candidate by ID (Public - for practices to view candidates)
 export async function getCandidateById(req, res) {
+  const logger = loggerBase.child('getCandidateById');
   const { id } = req.params; // Can be userId or candidate profile id
 
   try {
+    logger.debug('Fetching candidate by ID', { id });
     // Try to find by candidate profile id first
     let profile = await CandidateProfile.findByPk(id);
     let userId = null;
@@ -1184,6 +1521,7 @@ export async function getCandidateById(req, res) {
     }
 
     if (!profile) {
+      logger.warn('Candidate not found', { id });
       return res.status(404).json({ message: 'Candidate not found' });
     }
 
@@ -1223,9 +1561,9 @@ export async function getCandidateById(req, res) {
     // Add logo to profile object
     const profileWithLogo = profile
       ? {
-        ...profile.toJSON(),
-        logo,
-      }
+          ...profile.toJSON(),
+          logo,
+        }
       : null;
 
     return res.status(200).json({
@@ -1242,6 +1580,11 @@ export async function getCandidateById(req, res) {
       ratings,
     });
   } catch (error) {
+    logger.error(
+      'Error fetching candidate by ID',
+      { id, error: error.message },
+      error
+    );
     return res.status(500).json({ message: error.message });
   }
 }
