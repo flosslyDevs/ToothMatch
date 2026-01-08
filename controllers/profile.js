@@ -316,7 +316,7 @@ export async function uploadMedia(req, res) {
     logger.debug('Uploading media', { userId, kind });
     let media = null;
     // Replace media if its cover or profile picture
-    if (kind === 'cover' || kind === 'profile_photo') {
+    if (kind === 'cover_photo' || kind === 'profile_photo') {
       media = await Media.update({ url }, { where: { userId, kind } });
     } else {
       media = await Media.create({ userId, kind, url });
@@ -630,9 +630,9 @@ export async function getUnifiedProfile(req, res) {
       // Add logo to profile object
       const profileWithLogo = profile
         ? {
-            ...profile.toJSON(),
-            logo,
-          }
+          ...profile.toJSON(),
+          logo,
+        }
         : null;
 
       logger.debug('Candidate profile response prepared', { userId });
@@ -709,9 +709,9 @@ export async function getUnifiedProfile(req, res) {
     // Add logo to profile object
     const profileWithLogo = practiceProfile
       ? {
-          ...practiceProfile.toJSON(),
-          logo,
-        }
+        ...practiceProfile.toJSON(),
+        logo,
+      }
       : null;
 
     // Combine compliance documents and identity documents
@@ -1473,9 +1473,9 @@ export async function getCompleteProfile(req, res) {
     // Add logo to profile object
     const profileWithLogo = profile
       ? {
-          ...profile.toJSON(),
-          logo,
-        }
+        ...profile.toJSON(),
+        logo,
+      }
       : null;
 
     return res.status(200).json({
@@ -1560,9 +1560,9 @@ export async function getCandidateById(req, res) {
     // Add logo to profile object
     const profileWithLogo = profile
       ? {
-          ...profile.toJSON(),
-          logo,
-        }
+        ...profile.toJSON(),
+        logo,
+      }
       : null;
 
     return res.status(200).json({

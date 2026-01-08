@@ -34,7 +34,7 @@ export async function uploadUserMedia(req, res) {
     const url = buildFileUrl(req, file.path);
     let media = null;
     // Replace media if its cover or profile picture
-    if (kind === 'cover' || kind === 'profile_photo') {
+    if (kind === 'cover_photo' || kind === 'profile_photo') {
       media = await Media.update({ url }, { where: { userId, kind } });
     } else {
       media = await Media.create({ userId, kind, url });
