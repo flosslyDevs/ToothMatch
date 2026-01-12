@@ -6,11 +6,13 @@ import {
   User,
   UserFCMToken,
   Media,
-  PracticeMedia,
-  MatchLike,
-} from "../models/index.js";
-import { Op } from "sequelize";
-import { sendChatNotification } from "../utils/fcm.js";
+  Match,
+} from '../models/index.js';
+import { Op } from 'sequelize';
+import { sendChatNotification } from '../utils/fcm.js';
+import { logger as loggerRoot } from '../utils/logger.js';
+
+const loggerBase = loggerRoot.child('controllers/chat.js');
 
 /**
  * Get chat history between the authenticated user and a recipient
@@ -28,13 +30,17 @@ import { sendChatNotification } from "../utils/fcm.js";
  * When beforeMessageId is provided, returns messages older than that message
  */
 export async function getChatHistory(req, res) {
+  const logger = loggerBase.child('getChatHistory');
   try {
     const userId = req.user.sub; // Authenticated user ID from JWT
     const { threadId, receiverId, beforeMessageId } = req.query;
 
-    console.log(
-      `[getChatHistory] userId: ${userId}, threadId: ${threadId}, receiverId: ${receiverId}, beforeMessageId: ${beforeMessageId}`
-    );
+    logger.debug('Fetching chat history', {
+      userId,
+      threadId,
+      receiverId,
+      beforeMessageId,
+    });
 
     const messageLimit = 10;
     let resolvedThreadId = null;
@@ -55,7 +61,7 @@ export async function getChatHistory(req, res) {
 
       if (!userParticipant) {
         return res.status(403).json({
-          message: "Thread not found or user is not a participant",
+          message: 'Thread not found or user is not a participant',
         });
       }
 
@@ -63,11 +69,9 @@ export async function getChatHistory(req, res) {
     } else {
       // Fall back to finding thread by receiverId
       if (!receiverId) {
-        console.warn(
-          `[getChatHistory] Missing both threadId and receiverId param from userId: ${userId}`
-        );
+        logger.warn('Missing both threadId and receiverId', { userId });
         return res.status(400).json({
-          message: "Either threadId or receiverId is required",
+          message: 'Either threadId or receiverId is required',
         });
       }
 
@@ -78,7 +82,7 @@ export async function getChatHistory(req, res) {
         include: [
           {
             model: ChatThread,
-            where: { type: "direct" },
+            where: { type: 'direct' },
             include: [
               {
                 model: ChatThreadParticipant,
@@ -119,17 +123,19 @@ export async function getChatHistory(req, res) {
       });
 
       if (!cursorMessage) {
-        console.warn(
-          `[getChatHistory] Cursor message not found or does not belong to this thread. userId=${userId}, threadId=${resolvedThreadId}, beforeMessageId=${beforeMessageId}`
-        );
+        logger.warn('Cursor message not found or does not belong to thread', {
+          userId,
+          threadId: resolvedThreadId,
+          beforeMessageId,
+        });
         return res.status(404).json({
-          message: "Message not found or does not belong to this conversation",
+          message: 'Message not found or does not belong to this conversation',
         });
       }
 
-      console.log(
-        `[getChatHistory] Found cursorMessage with createdAt: ${cursorMessage.createdAt}`
-      );
+      logger.debug('Found cursor message', {
+        createdAt: cursorMessage.createdAt,
+      });
       // Fetch messages older than the cursor message
       whereClause.createdAt = {
         [Op.lt]: cursorMessage.createdAt,
@@ -140,14 +146,16 @@ export async function getChatHistory(req, res) {
     // When loading older messages, we want messages before the cursor
     const messages = await ChatMessage.findAll({
       where: whereClause,
-      order: [["createdAt", "DESC"]],
+      order: [['createdAt', 'DESC']],
       limit: messageLimit,
-      attributes: ["id", "senderId", "message", "createdAt"],
+      attributes: ['id', 'senderId', 'message', 'createdAt'],
     });
 
-    console.log(
-      `[getChatHistory] Fetched ${messages.length} messages for userId=${userId}, threadId=${resolvedThreadId}.`
-    );
+    logger.debug('Fetched messages', {
+      count: messages.length,
+      userId,
+      threadId: resolvedThreadId,
+    });
 
     // Determine if there are more messages to load
     let remaining = 0;
@@ -166,13 +174,13 @@ export async function getChatHistory(req, res) {
       remaining = await ChatMessage.count({
         where: olderWhereClause,
       });
-      console.log(
-        `[getChatHistory] Remaining older messages count: ${remaining}`
-      );
+      logger.debug('Remaining messages count', { remaining });
     } else {
-      console.log(
-        `[getChatHistory] No messages found for userId=${userId}, threadId=${resolvedThreadId} with params beforeMessageId=${beforeMessageId}.`
-      );
+      logger.debug('No messages found', {
+        userId,
+        threadId: resolvedThreadId,
+        beforeMessageId,
+      });
     }
 
     return res.status(200).json({
@@ -182,12 +190,13 @@ export async function getChatHistory(req, res) {
       },
     });
   } catch (error) {
-    console.error(
-      `[getChatHistory] Error fetching chat history for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error fetching chat history',
+      { userId: req?.user?.sub, error: error.message },
       error
     );
     return res.status(500).json({
-      message: "Error fetching chat history",
+      message: 'Error fetching chat history',
       error: error.message,
     });
   }
@@ -202,19 +211,18 @@ export async function getChatHistory(req, res) {
  * Returns chats list with the latest message data
  */
 export async function getChats(req, res) {
+  const logger = loggerBase.child('getChats');
   const userId = req.user.sub;
-  console.log(`[getChats] Called by userId=${userId}`);
+  logger.debug('Fetching chats', { userId });
 
   if (!userId) {
-    console.warn(`[getChats] No userId found in request`);
-    return res.status(401).json({ message: "User not authenticated" });
+    logger.warn('No userId found in request');
+    return res.status(401).json({ message: 'User not authenticated' });
   }
 
   try {
     // Optimized: Get all threads where user is a participant with latest messages in one query
-    console.log(
-      `[getChats] Fetching chat thread participants for userId=${userId}`
-    );
+    logger.debug('Fetching chat thread participants', { userId });
     const userParticipants = await ChatThreadParticipant.findAll({
       where: { userId },
       include: [
@@ -224,9 +232,9 @@ export async function getChats(req, res) {
             {
               model: ChatMessage,
               separate: true,
-              order: [["createdAt", "DESC"]],
+              order: [['createdAt', 'DESC']],
               limit: 1,
-              attributes: ["id", "senderId", "message", "createdAt"],
+              attributes: ['id', 'senderId', 'message', 'createdAt'],
             },
             {
               model: ChatThreadParticipant,
@@ -235,8 +243,22 @@ export async function getChats(req, res) {
               include: [
                 {
                   model: User,
-                  attributes: ["id", "fullName"],
+                  attributes: ['id', 'fullName'],
                   required: false,
+                  include: [
+                    {
+                      model: Media,
+                      attributes: ['kind', 'url'],
+                      limit: 1,
+                      separate: true,
+                      required: false,
+                      where: {
+                        kind: {
+                          [Op.in]: ['logo', 'profile_photo'],
+                        },
+                      },
+                    },
+                  ],
                 },
               ],
             },
@@ -245,51 +267,33 @@ export async function getChats(req, res) {
       ],
     });
 
-    console.log(
-      `[getChats] Found ${userParticipants.length} chat threads for userId=${userId}`
-    );
+    logger.debug('Found chat threads', {
+      count: userParticipants.length,
+      userId,
+    });
 
-    const otherUserIds = userParticipants
-      .map((p) => {
-        const otherParticipant = p.ChatThread?.ChatThreadParticipants?.[0];
-        return otherParticipant?.userId;
-      })
-      .filter(Boolean);
-
-    // Batch fetch all media for other users
-    const [profilePictures, practiceLogos] = await Promise.all([
-      Media.findAll({
-        where: {
-          userId: { [Op.in]: otherUserIds },
-          kind: "profile_picture",
-        },
-        attributes: ["userId", "url"],
-      }),
-      PracticeMedia.findAll({
-        where: {
-          userId: { [Op.in]: otherUserIds },
-          kind: "logo",
-        },
-        attributes: ["userId", "url"],
-      }),
-    ]);
-
-    // Create lookup maps for media
-    const profilePictureMap = new Map(
-      profilePictures.map((m) => [m.userId, m.url])
-    );
-    const practiceLogoMap = new Map(
-      practiceLogos.map((m) => [m.userId, m.url])
-    );
+    // Avatar map for other users
+    const avatarMap = new Map();
+    for (const participant of userParticipants) {
+      const otherParticipant =
+        participant.ChatThread?.ChatThreadParticipants?.[0];
+      if (!otherParticipant) {
+        continue;
+      }
+      const otherUserId = otherParticipant.userId;
+      const otherUser = otherParticipant.User;
+      const avatar = otherUser?.Media?.[0]?.url || null;
+      avatarMap.set(otherUserId, avatar);
+    }
 
     // Build response data
     const chatsData = [];
     for (const participant of userParticipants) {
       const thread = participant.ChatThread;
       if (!thread) {
-        console.warn(
-          `[getChats] ChatThread missing for participantId=${participant.id}`
-        );
+        logger.warn('ChatThread missing for participant', {
+          participantId: participant.id,
+        });
         continue;
       }
 
@@ -298,9 +302,9 @@ export async function getChats(req, res) {
       const otherParticipant = thread.ChatThreadParticipants?.[0];
 
       if (!otherParticipant) {
-        console.warn(
-          `[getChats] No other participant found for threadId=${thread.id}`
-        );
+        logger.warn('No other participant found for thread', {
+          threadId: thread.id,
+        });
         continue;
       }
 
@@ -310,10 +314,7 @@ export async function getChats(req, res) {
       const otherUserData = {
         id: otherUserId,
         name: otherUser?.fullName || null,
-        avatar:
-          profilePictureMap.get(otherUserId) ||
-          practiceLogoMap.get(otherUserId) ||
-          null,
+        avatar: avatarMap.get(otherUserId) || null,
       };
 
       chatsData.push({
@@ -328,7 +329,7 @@ export async function getChats(req, res) {
             }
           : {
               senderId: null,
-              message: "You started a new conversation",
+              message: 'You started a new conversation',
             },
         lastReadAt: participant.lastReadAt,
         muted: participant.muted,
@@ -336,19 +337,21 @@ export async function getChats(req, res) {
       });
     }
 
-    console.log(
-      `[getChats] Returning ${chatsData.length} chats for userId=${userId}`
-    );
+    logger.debug('Returning chats', { count: chatsData.length, userId });
     return res.status(200).json({
       chats: chatsData.sort(
         (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
       ),
     });
   } catch (error) {
-    console.error("Error fetching chats:", error);
+    logger.error(
+      'Error fetching chats',
+      { userId, error: error.message },
+      error
+    );
     return res
       .status(500)
-      .json({ message: error.message || "Internal server error" });
+      .json({ message: error.message || 'Internal server error' });
   }
 }
 
@@ -366,27 +369,30 @@ export async function getChats(req, res) {
  * Returns the created message and FCM send status
  */
 export async function sendMessage(req, res) {
+  const logger = loggerBase.child('sendMessage');
   try {
     const senderId = req.user.sub; // Authenticated user ID from JWT
     const { receiverId, message } = req.body;
 
-    console.log(
-      `[sendMessage] senderId: ${senderId}, receiverId: ${receiverId}, message length: ${message?.length}`
-    );
+    logger.debug('Sending message', {
+      senderId,
+      receiverId,
+      messageLength: message?.length,
+    });
 
     // Validate required fields
     if (!message || !receiverId) {
       return res.status(400).json({
-        message: "Invalid message or receiver ID",
-        code: "MISSING_FIELDS",
+        message: 'Invalid message or receiver ID',
+        code: 'MISSING_FIELDS',
       });
     }
 
     // Validate sender is authenticated
     if (!senderId) {
       return res.status(401).json({
-        message: "Not authenticated",
-        code: "NOT_AUTHENTICATED",
+        message: 'Not authenticated',
+        code: 'NOT_AUTHENTICATED',
       });
     }
 
@@ -394,8 +400,8 @@ export async function sendMessage(req, res) {
     const receiver = await User.findByPk(receiverId);
     if (!receiver) {
       return res.status(404).json({
-        message: "Receiver not found",
-        code: "RECEIVER_NOT_FOUND",
+        message: 'Receiver not found',
+        code: 'RECEIVER_NOT_FOUND',
       });
     }
 
@@ -406,18 +412,18 @@ export async function sendMessage(req, res) {
       trimmedMessage.length > 0 && !isMessageToSelf && message.length < 1000;
 
     if (!isMessageValid) {
-      let reason = "Invalid message";
+      let reason = 'Invalid message';
       if (isMessageToSelf) {
-        reason = "Cannot send message to self";
+        reason = 'Cannot send message to self';
       } else if (trimmedMessage.length === 0) {
-        reason = "Message cannot be empty";
+        reason = 'Message cannot be empty';
       } else if (message.length >= 1000) {
-        reason = "Message too long (max 1000 characters)";
+        reason = 'Message too long (max 1000 characters)';
       }
 
       return res.status(400).json({
         message: reason,
-        code: "INVALID_MESSAGE",
+        code: 'INVALID_MESSAGE',
       });
     }
 
@@ -440,10 +446,10 @@ export async function sendMessage(req, res) {
           {
             [Op.or]: [
               {
-                status: "confirmed",
+                status: 'confirmed',
               },
               {
-                status: "completed",
+                status: 'completed',
               },
             ],
           },
@@ -452,30 +458,23 @@ export async function sendMessage(req, res) {
     });
 
     // Check if the users have liked each other
-    const likesCount = await MatchLike.count({
+    const matchExists = await Match.findOne({
       where: {
-        [Op.or]: [
-          {
-            candidateUserId: senderId,
-            practiceUserId: receiverId,
-          },
-          {
-            candidateUserId: receiverId,
-            practiceUserId: senderId,
-          },
-        ],
+        [Op.or]: [{ candidateUserId: senderId }, { practiceUserId: senderId }],
+        status: 'matched',
       },
+      attributes: ['id'],
     });
 
     /** If there are any confirmed or completed interviews between the two users, the user is permitted to send a message */
-    const isPermitted = interviewsCount > 0 || likesCount > 0;
+    const isPermitted = interviewsCount > 0 || matchExists;
 
     // Check permission
     if (!isPermitted) {
       return res.status(403).json({
         message:
-          "No permission to send message. You must either have a confirmed or completed interview with this user, or have liked each other.",
-        code: "NO_PERMISSION",
+          'No permission to send message. You must either have a confirmed or completed interview with this user, or have liked each other.',
+        code: 'NO_PERMISSION',
       });
     }
 
@@ -484,25 +483,18 @@ export async function sendMessage(req, res) {
       include: [
         {
           model: Media,
-          attributes: ["url"],
+          attributes: ['url'],
           required: false,
           where: {
-            kind: "profile_picture",
-          },
-        },
-        {
-          model: PracticeMedia,
-          attributes: ["url"],
-          required: false,
-          where: {
-            kind: "logo",
+            kind: {
+              [Op.in]: ['profile_photo', 'logo'],
+            },
           },
         },
       ],
     });
-    const senderName = sender?.fullName || "Someone";
-    const senderAvatar =
-      sender?.Media?.[0]?.url || sender?.PracticeMedia?.[0]?.url || null;
+    const senderName = sender?.fullName || 'Someone';
+    const senderAvatar = sender?.Media?.[0]?.url || null;
 
     // Find or create thread between sender and receiver
     // Get thread where both users are participants
@@ -511,7 +503,7 @@ export async function sendMessage(req, res) {
       include: [
         {
           model: ChatThread,
-          where: { type: "direct" },
+          where: { type: 'direct' },
           include: [
             {
               model: ChatThreadParticipant,
@@ -528,7 +520,7 @@ export async function sendMessage(req, res) {
     // If thread doesn't exist, create it
     if (!thread) {
       thread = await ChatThread.create({
-        type: "direct",
+        type: 'direct',
       });
 
       // Create participants for both users
@@ -596,7 +588,7 @@ export async function sendMessage(req, res) {
       const invalidTokenIds = [];
       const validTokenIds = [];
       results.forEach((result, index) => {
-        if (result.status === "fulfilled") {
+        if (result.status === 'fulfilled') {
           if (result.value.success) {
             fcmResults.successful++;
             // Track valid tokens to update lastUsedAt
@@ -604,16 +596,16 @@ export async function sendMessage(req, res) {
           } else {
             fcmResults.failed++;
             // If token is invalid, mark for deletion
-            if (result.value.error === "INVALID_TOKEN") {
+            if (result.value.error === 'INVALID_TOKEN') {
               invalidTokenIds.push(receiverTokens[index].id);
             }
           }
         } else {
           fcmResults.failed++;
-          console.error(
-            `[sendMessage] FCM promise rejected for token ${receiverTokens[index].id}:`,
-            result.reason
-          );
+          logger.warn('FCM promise rejected', {
+            tokenId: receiverTokens[index].id,
+            error: result.reason?.message || result.reason,
+          });
         }
       });
 
@@ -630,14 +622,13 @@ export async function sendMessage(req, res) {
         await UserFCMToken.destroy({
           where: { id: { [Op.in]: invalidTokenIds } },
         });
-        console.log(
-          `[sendMessage] Removed ${invalidTokenIds.length} invalid FCM tokens for user ${receiverId}`
-        );
+        logger.info('Removed invalid FCM tokens', {
+          count: invalidTokenIds.length,
+          receiverId,
+        });
       }
     } else {
-      console.log(
-        `[sendMessage] Receiver ${receiverId} has no FCM tokens, skipping notification`
-      );
+      logger.debug('Receiver has no FCM tokens', { receiverId });
     }
 
     return res.status(201).json({
@@ -650,13 +641,14 @@ export async function sendMessage(req, res) {
       },
     });
   } catch (error) {
-    console.error(
-      `[sendMessage] Error sending message for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error sending message',
+      { userId: req?.user?.sub, error: error.message },
       error
     );
     return res.status(500).json({
-      message: "Failed to send message",
-      code: "SERVER_ERROR",
+      message: 'Failed to send message',
+      code: 'SERVER_ERROR',
       error: error.message,
     });
   }
@@ -672,13 +664,16 @@ export async function sendMessage(req, res) {
  * - threadId (required): UUID of the thread
  */
 export async function markThreadAsRead(req, res) {
+  const logger = loggerBase.child('markThreadAsRead');
+  const userId = req.user.sub;
+  const { threadId } = req.params;
+
   try {
-    const userId = req.user.sub;
-    const { threadId } = req.params;
+    logger.debug('Marking thread as read', { userId, threadId });
 
     if (!threadId) {
       return res.status(400).json({
-        message: "threadId is required",
+        message: 'threadId is required',
       });
     }
 
@@ -692,7 +687,7 @@ export async function markThreadAsRead(req, res) {
 
     if (!participant) {
       return res.status(404).json({
-        message: "Thread not found or user is not a participant",
+        message: 'Thread not found or user is not a participant',
       });
     }
 
@@ -702,16 +697,17 @@ export async function markThreadAsRead(req, res) {
     });
 
     return res.status(200).json({
-      message: "Thread marked as read",
+      message: 'Thread marked as read',
       lastReadAt: participant.lastReadAt,
     });
   } catch (error) {
-    console.error(
-      `[markThreadAsRead] Error marking thread as read for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error marking thread as read',
+      { userId: req?.user?.sub, threadId, error: error.message },
       error
     );
     return res.status(500).json({
-      message: "Failed to mark thread as read",
+      message: 'Failed to mark thread as read',
       error: error.message,
     });
   }
@@ -727,13 +723,15 @@ export async function markThreadAsRead(req, res) {
  * - threadId (required): UUID of the thread
  */
 export async function toggleThreadMute(req, res) {
+  const logger = loggerBase.child('toggleThreadMute');
+  const userId = req.user.sub;
+  const { threadId } = req.params;
   try {
-    const userId = req.user.sub;
-    const { threadId } = req.params;
+    logger.debug('Toggling thread mute', { userId, threadId });
 
     if (!threadId) {
       return res.status(400).json({
-        message: "threadId is required",
+        message: 'threadId is required',
       });
     }
 
@@ -747,7 +745,7 @@ export async function toggleThreadMute(req, res) {
 
     if (!participant) {
       return res.status(404).json({
-        message: "Thread not found or user is not a participant",
+        message: 'Thread not found or user is not a participant',
       });
     }
 
@@ -758,16 +756,17 @@ export async function toggleThreadMute(req, res) {
     });
 
     return res.status(200).json({
-      message: `Thread ${newMutedStatus ? "muted" : "unmuted"}`,
+      message: `Thread ${newMutedStatus ? 'muted' : 'unmuted'}`,
       muted: newMutedStatus,
     });
   } catch (error) {
-    console.error(
-      `[toggleThreadMute] Error toggling thread mute for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error toggling thread mute',
+      { userId: req?.user?.sub, threadId, error: error.message },
       error
     );
     return res.status(500).json({
-      message: "Failed to toggle thread mute",
+      message: 'Failed to toggle thread mute',
       error: error.message,
     });
   }
@@ -783,13 +782,17 @@ export async function toggleThreadMute(req, res) {
  * - threadId (required): UUID of the thread
  */
 export async function toggleThreadArchive(req, res) {
+  const logger = loggerBase.child('toggleThreadArchive');
+
+  const userId = req.user.sub;
+  const { threadId } = req.params;
+
   try {
-    const userId = req.user.sub;
-    const { threadId } = req.params;
+    logger.debug('Toggling thread archive', { userId, threadId });
 
     if (!threadId) {
       return res.status(400).json({
-        message: "threadId is required",
+        message: 'threadId is required',
       });
     }
 
@@ -803,7 +806,7 @@ export async function toggleThreadArchive(req, res) {
 
     if (!participant) {
       return res.status(404).json({
-        message: "Thread not found or user is not a participant",
+        message: 'Thread not found or user is not a participant',
       });
     }
 
@@ -814,16 +817,17 @@ export async function toggleThreadArchive(req, res) {
     });
 
     return res.status(200).json({
-      message: `Thread ${newArchivedStatus ? "archived" : "unarchived"}`,
+      message: `Thread ${newArchivedStatus ? 'archived' : 'unarchived'}`,
       archived: newArchivedStatus,
     });
   } catch (error) {
-    console.error(
-      `[toggleThreadArchive] Error toggling thread archive for userId=${req?.user?.sub}. Error:`,
+    logger.error(
+      'Error toggling thread archive',
+      { userId: req?.user?.sub, threadId, error: error.message },
       error
     );
     return res.status(500).json({
-      message: "Failed to toggle thread archive",
+      message: 'Failed to toggle thread archive',
       error: error.message,
     });
   }

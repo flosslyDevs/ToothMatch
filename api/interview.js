@@ -1,14 +1,15 @@
 import express from 'express';
 import { authMiddleware } from '../utils/auth.js';
-import { 
-	scheduleInterview, 
-	getCandidateInterviews, 
-	getPracticeInterviews,
-	getMyInterviews,
-	requestReschedule,
-	approveReschedule,
-	declineInterview,
-	acceptInterview
+import {
+  scheduleInterview,
+  getCandidateInterviews,
+  getPracticeInterviews,
+  getMyInterviews,
+  requestReschedule,
+  approveReschedule,
+  declineReschedule,
+  declineInterview,
+  acceptInterview,
 } from '../controllers/interview.js';
 
 const router = express.Router();
@@ -34,6 +35,9 @@ router.post('/:id/reschedule-request', requestReschedule);
 // Practice: Approve reschedule and update interview date/time
 router.put('/:id/reschedule', approveReschedule);
 
+// Practice: Decline reschedule request
+router.post('/:id/reschedule-decline', declineReschedule);
+
 // Candidate: Accept (confirm) an interview
 router.post('/:id/accept', acceptInterview);
 
@@ -41,4 +45,3 @@ router.post('/:id/accept', acceptInterview);
 router.post('/:id/decline', declineInterview);
 
 export default router;
-

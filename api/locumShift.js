@@ -1,12 +1,12 @@
 import express from 'express';
 import { authMiddleware } from '../utils/auth.js';
 import {
-	createLocumShift,
-	getLocumShifts,
-	getLocumShiftById,
-	updateLocumShift,
-	deleteLocumShift,
-	getPublicLocumShifts
+  createLocumShift,
+  getLocumShifts,
+  getLocumShiftById,
+  updateLocumShift,
+  deleteLocumShift,
+  getPublicLocumShifts,
 } from '../controllers/locumShift.js';
 
 const router = express.Router();

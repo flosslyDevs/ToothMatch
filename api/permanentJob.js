@@ -1,12 +1,12 @@
 import express from 'express';
 import { authMiddleware } from '../utils/auth.js';
 import {
-	createPermanentJob,
-	getPermanentJobs,
-	getPermanentJobById,
-	updatePermanentJob,
-	deletePermanentJob,
-	getPublicPermanentJobs
+  createPermanentJob,
+  getPermanentJobs,
+  getPermanentJobById,
+  updatePermanentJob,
+  deletePermanentJob,
+  getPublicPermanentJobs,
 } from '../controllers/permanentJob.js';
 
 const router = express.Router();

@@ -1,8 +1,8 @@
-import { DataTypes } from "sequelize";
-import { sequelize } from "../../services/db.js";
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../../services/db.js';
 
 const ChatThread = sequelize.define(
-  "ChatThread",
+  'ChatThread',
   {
     id: {
       type: DataTypes.UUID,
@@ -10,14 +10,14 @@ const ChatThread = sequelize.define(
       primaryKey: true,
     },
     type: {
-      type: DataTypes.ENUM("direct", "group"),
+      type: DataTypes.ENUM('direct', 'group'),
       allowNull: false,
-      defaultValue: "direct",
+      defaultValue: 'direct',
     },
     createdAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     updatedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },
-  { tableName: "chat_threads", underscored: true }
+  { tableName: 'chat_threads', underscored: true }
 );
 
 export default ChatThread;
