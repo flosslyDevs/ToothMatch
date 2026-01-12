@@ -648,6 +648,81 @@ export async function approveReschedule(req, res) {
   }
 }
 
+// Practice: Decline reschedule request
+export async function declineReschedule(req, res) {
+  const logger = loggerBase.child('declineReschedule');
+  const practiceUserId = req.user?.sub;
+  const { id } = req.params;
+
+  try {
+    logger.debug('Declining reschedule request', {
+      practiceUserId,
+      interviewId: id,
+    });
+
+    if (!practiceUserId) {
+      logger.warn('Unauthenticated reschedule decline request');
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
+    // Verify user is a practice
+    const practice = await User.findByPk(practiceUserId);
+    if (!practice || practice.role !== 'practice') {
+      return res
+        .status(403)
+        .json({ message: 'Only practices can decline reschedule requests' });
+    }
+
+    // Find the interview
+    const interview = await Interview.findByPk(id);
+    if (!interview) {
+      return res.status(404).json({ message: 'Interview not found' });
+    }
+
+    // Verify the interview belongs to this practice
+    if (interview.practiceUserId !== practiceUserId) {
+      return res.status(403).json({
+        message: 'You can only decline reschedule for your own interviews',
+      });
+    }
+
+    // Check if there's a pending reschedule request
+    if (!interview.rescheduleRequested) {
+      return res
+        .status(400)
+        .json({ message: 'No pending reschedule request for this interview' });
+    }
+
+    // Clear reschedule request fields (keep existing interview date/time)
+    await interview.update({
+      rescheduleRequested: false,
+      rescheduleRequestDate: null,
+      rescheduleRequestReason: null,
+      rescheduleRequestedDate: null,
+      rescheduleRequestedTime: null,
+    });
+
+    logger.info('Reschedule request declined', {
+      practiceUserId,
+      interviewId: id,
+    });
+
+    return res.status(200).json({
+      message: 'Reschedule request declined successfully',
+    });
+  } catch (error) {
+    logger.error(
+      'Error declining reschedule request',
+      { practiceUserId, interviewId: id, error: error.message },
+      error
+    );
+    return res.status(500).json({
+      message: 'Error declining reschedule request',
+      error: error.message,
+    });
+  }
+}
+
 // Candidate: Decline an interview
 export async function declineInterview(req, res) {
   const logger = loggerBase.child('declineInterview');
