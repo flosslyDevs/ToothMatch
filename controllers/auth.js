@@ -319,6 +319,7 @@ export async function googleAuth(event) {
 
     // Update FCM token if provided
     if (fcmToken) {
+      logger.debug(`Updating FCM token for user`, { userId: user.id });
       try {
         await updateFCMTokenForUser(user.id, fcmToken, deviceId, deviceType);
       } catch (error) {
