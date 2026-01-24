@@ -1,6 +1,6 @@
 import User from './auth/users.js';
 import UserFCMToken from './auth/userFCMToken.js';
-import {Event, Booking} from './events/index.js';
+import { Event, Booking } from './events/index.js';
 import CandidateProfile from './profile/candidateProfile.js';
 import Education from './profile/education.js';
 import WorkExperience from './profile/workExperience.js';
@@ -14,7 +14,6 @@ import IdentityDocument from './profile/identityDocument.js';
 import JobPreference from './profile/jobPreference.js';
 import AvailabilitySlot from './profile/availabilitySlot.js';
 import PracticeProfile from './practice/practiceProfile.js';
-import PracticeMedia from './practice/practiceMedia.js';
 import PracticeLocation from './practice/practiceLocation.js';
 import PracticeCompliance from './practice/practiceCompliance.js';
 import PracticePayment from './practice/practicePayment.js';
@@ -46,8 +45,14 @@ User.hasOne(WorkPersonality, { foreignKey: 'userId' });
 User.belongsToMany(Skill, { through: UserSkill, foreignKey: 'userId' });
 Skill.belongsToMany(User, { through: UserSkill, foreignKey: 'skillId' });
 
-User.belongsToMany(Specialization, { through: UserSpecialization, foreignKey: 'userId' });
-Specialization.belongsToMany(User, { through: UserSpecialization, foreignKey: 'specializationId' });
+User.belongsToMany(Specialization, {
+  through: UserSpecialization,
+  foreignKey: 'userId',
+});
+Specialization.belongsToMany(User, {
+  through: UserSpecialization,
+  foreignKey: 'specializationId',
+});
 
 // Join table associations
 UserSkill.belongsTo(User, { foreignKey: 'userId' });
@@ -56,7 +61,9 @@ User.hasMany(UserSkill, { foreignKey: 'userId' });
 Skill.hasMany(UserSkill, { foreignKey: 'skillId' });
 
 UserSpecialization.belongsTo(User, { foreignKey: 'userId' });
-UserSpecialization.belongsTo(Specialization, { foreignKey: 'specializationId' });
+UserSpecialization.belongsTo(Specialization, {
+  foreignKey: 'specializationId',
+});
 User.hasMany(UserSpecialization, { foreignKey: 'userId' });
 Specialization.hasMany(UserSpecialization, { foreignKey: 'specializationId' });
 
@@ -76,9 +83,6 @@ User.hasMany(AvailabilitySlot, { foreignKey: 'userId' });
 PracticeProfile.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(PracticeProfile, { foreignKey: 'userId' });
 
-PracticeMedia.belongsTo(User, { foreignKey: 'userId' });
-User.hasMany(PracticeMedia, { foreignKey: 'userId' });
-
 PracticeLocation.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(PracticeLocation, { foreignKey: 'userId' });
 
@@ -86,14 +90,23 @@ PracticeCompliance.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(PracticeCompliance, { foreignKey: 'userId' });
 
 // Practice Profile associations with related models
-PracticeProfile.hasMany(PracticeMedia, { foreignKey: 'userId', sourceKey: 'userId' });
-PracticeMedia.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+PracticeProfile.hasMany(PracticeLocation, {
+  foreignKey: 'userId',
+  sourceKey: 'userId',
+});
+PracticeLocation.belongsTo(PracticeProfile, {
+  foreignKey: 'userId',
+  targetKey: 'userId',
+});
 
-PracticeProfile.hasMany(PracticeLocation, { foreignKey: 'userId', sourceKey: 'userId' });
-PracticeLocation.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
-
-PracticeProfile.hasOne(PracticeCompliance, { foreignKey: 'userId', sourceKey: 'userId' });
-PracticeCompliance.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
+PracticeProfile.hasOne(PracticeCompliance, {
+  foreignKey: 'userId',
+  sourceKey: 'userId',
+});
+PracticeCompliance.belongsTo(PracticeProfile, {
+  foreignKey: 'userId',
+  targetKey: 'userId',
+});
 
 PracticePayment.belongsTo(User, { foreignKey: 'userId' });
 User.hasOne(PracticePayment, { foreignKey: 'userId' });
@@ -105,21 +118,39 @@ User.hasOne(PracticeCulture, { foreignKey: 'userId' });
 LocumShift.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(LocumShift, { foreignKey: 'userId' });
 
-LocumShift.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
-PracticeProfile.hasMany(LocumShift, { foreignKey: 'userId', sourceKey: 'userId' });
+LocumShift.belongsTo(PracticeProfile, {
+  foreignKey: 'userId',
+  targetKey: 'userId',
+});
+PracticeProfile.hasMany(LocumShift, {
+  foreignKey: 'userId',
+  sourceKey: 'userId',
+});
 
 // Permanent Job associations
 PermanentJob.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(PermanentJob, { foreignKey: 'userId' });
 
-PermanentJob.belongsTo(PracticeProfile, { foreignKey: 'userId', targetKey: 'userId' });
-PracticeProfile.hasMany(PermanentJob, { foreignKey: 'userId', sourceKey: 'userId' });
+PermanentJob.belongsTo(PracticeProfile, {
+  foreignKey: 'userId',
+  targetKey: 'userId',
+});
+PracticeProfile.hasMany(PermanentJob, {
+  foreignKey: 'userId',
+  sourceKey: 'userId',
+});
 
 // Interview associations
 Interview.belongsTo(User, { foreignKey: 'practiceUserId', as: 'Practice' });
 Interview.belongsTo(User, { foreignKey: 'candidateUserId', as: 'Candidate' });
-User.hasMany(Interview, { foreignKey: 'practiceUserId', as: 'ScheduledInterviews' });
-User.hasMany(Interview, { foreignKey: 'candidateUserId', as: 'CandidateInterviews' });
+User.hasMany(Interview, {
+  foreignKey: 'practiceUserId',
+  as: 'ScheduledInterviews',
+});
+User.hasMany(Interview, {
+  foreignKey: 'candidateUserId',
+  as: 'CandidateInterviews',
+});
 
 // Event associations
 Event.belongsTo(User, { foreignKey: 'userId' });
@@ -153,39 +184,36 @@ UserFCMToken.belongsTo(User, { foreignKey: 'userId' });
 User.hasMany(UserFCMToken, { foreignKey: 'userId' });
 
 export {
-	User,
-	UserFCMToken,
-	Booking,
-	Event,
-	ChatMessage,
-	ChatThread,
-	ChatThreadParticipant,
-	CandidateProfile,
-	Education,
-	WorkExperience,
-	WorkPersonality,
-	Skill,
-	Specialization,
-	UserSkill,
-	UserSpecialization,
-	Media,
-	IdentityDocument,
-	JobPreference,
-	AvailabilitySlot,
-	PracticeProfile,
-	PracticeMedia,
-	PracticeLocation,
-	PracticeCompliance,
-	PracticePayment,
-	PracticeCulture,
-	LocumShift,
-    PermanentJob,
-    Interview,
-    MatchLike,
-    Match,
-	Rating,
-	Blocklist,
-	Report,
+  User,
+  UserFCMToken,
+  Booking,
+  Event,
+  ChatMessage,
+  ChatThread,
+  ChatThreadParticipant,
+  CandidateProfile,
+  Education,
+  WorkExperience,
+  WorkPersonality,
+  Skill,
+  Specialization,
+  UserSkill,
+  UserSpecialization,
+  Media,
+  IdentityDocument,
+  JobPreference,
+  AvailabilitySlot,
+  PracticeProfile,
+  PracticeLocation,
+  PracticeCompliance,
+  PracticePayment,
+  PracticeCulture,
+  LocumShift,
+  PermanentJob,
+  Interview,
+  MatchLike,
+  Match,
+  Rating,
+  Blocklist,
+  Report,
 };
-
-
